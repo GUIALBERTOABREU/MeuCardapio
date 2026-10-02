@@ -264,6 +264,101 @@
     ]);
   }
 
+  /* ---------------------------------------------------------
+     3b. Leitura dos links de imagem (JSONP)
+     ---------------------------------------------------------
+     O Apps Script nao devolve cabecalho CORS, entao um fetch
+     seria barrado. JSONP contorna: o navegador executa
+     <script> de outra origem sem reclamar, e o script responde
+     chamando uma funcao que criamos antes.
+
+     Cuidado: o texto devolvido roda como codigo na nossa
+     pagina. Por isso o nome da funcao eigo com prefixo fixo e
+     um contador, nunca com nada vindo de fora.
+     --------------------------------------------------------- */
+  var contadorCallback = 0;
+
+  function lerImagens() {
+    if (!configurada()) return Promise.resolve({ ignorado: true, motivo: 'sem-url' });
+
+    var c = cfg();
+    /* O nome precisa usar SO [A-Za-z0-9_$]: o script recorta
+       qualquer outro caractere do callback antes de montar a
+       resposta, e um nome com "__" nos cantos chegaria la com um
+       underscore a menos e a funcao nunca seria chamada. */
+    var nome = 'cardapioImg' + (++contadorCallback);
+    var url = c.planilhaUrl.replace(/&?callback=[^&]*/, '') +
+      (c.planilhaUrl.indexOf('?') < 0 ? '?' : '&') +
+      'callback=' + nome +
+      (c.planilhaToken ? '&token=' + encodeURIComponent(c.planilhaToken) : '');
+
+    return new Promise(function (resolve) {
+      var script = document.createElement('script');
+      /* A carga da pagina nao pode ficar esperando o Google.
+         Sem este timeout, um Web App publicado errado prenderia
+         o cardapio preso em "carregando" para sempre. */
+      var relogio = setTimeout(function () {
+        limpar();
+        resolve({ ok: false, erro: 'Tempo esgotado ao buscar as imagens na planilha.' });
+      }, 6000);
+
+      function limpar() {
+        clearTimeout(relogio);
+        if (script.parentNode) script.parentNode.removeChild(script);
+        try { delete window[nome]; } catch (e) { window[nome] = undefined; }
+      }
+
+      window[nome] = function (resposta) {
+        limpar();
+        if (!resposta || resposta.ok !== true) {
+          resolve({ ok: false, erro: (resposta && resposta.erro) || 'Resposta inesperada do script.' });
+          return;
+        }
+        resolve({ ok: true, imagens: resposta.imagens || {} });
+      };
+
+      script.onerror = function () {
+        limpar();
+        resolve({ ok: false, erro: 'Não foi possível carregar o script da planilha.' });
+      };
+
+      script.src = url;
+      script.async = true;
+      (document.head || document.body).appendChild(script);
+    });
+  }
+
+  /**
+   * Sobrescreve item.imagem com o que veio da planilha e devolve
+   * quantos itens mudaram de fato — e o que o painel mostra para
+   * o dono saber se vale conferir a aba.
+   */
+  function aplicarImagens(imagens) {
+    var Store = window.CardapioStore;
+    if (!Store || !imagens || !Object.keys(imagens).length) return { alterados: 0 };
+
+    var antes = Store.serializar();
+    var alterados = 0;
+
+    Store.alterar(function (d) {
+      d.categorias.forEach(function (cat) {
+        (cat.itens || []).forEach(function (item) {
+          var link = imagens[semAcento(cat.nome) + '|' + semAcento(item.nome)];
+          if (link && item.imagem !== link) {
+            item.imagem = link;
+            alterados++;
+          }
+        });
+      });
+    });
+
+    /* nada mudou: nao deixa o cardapio na ultima edicao data de
+       hoje por causa de uma releitura identica. */
+    if (Store.serializar() === antes) return { alterados: 0 };
+
+    return { alterados: alterados };
+  }
+
   function enviarCardapio() {
     if (!configurada()) return Promise.resolve({ ignorado: true, motivo: 'sem-url' });
 
@@ -284,6 +379,8 @@
     configurada: configurada,
     enviarPedido: enviarPedido,
     enviarCardapio: enviarCardapio,
+    lerImagens: lerImagens,
+    aplicarImagens: aplicarImagens,
     catalogo: catalogo,
     ultimoEnvio: ultimoEnvio,
     cabecalhos: {

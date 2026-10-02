@@ -833,6 +833,32 @@
     Store.assinar(render);
     podarCarrinho();
     render();
+
+    /* Depois da primeira pintura, para nao travar a abertura
+       esperando o Google responder. */
+    carregarImagens();
+  }
+
+  /* ---------- imagens vindas da planilha ----------
+     O Apps Script nao devolve cabecalho CORS, entao a leitura usa
+     JSONP (planilha.js). O cardapio ja aparece com o que tem no
+     cardapio.json; se a planilha responder, os links de imagem
+     trocam no lugar. */
+  function carregarImagens() {
+    var P = window.CardapioPlanilha;
+    if (!P || !P.configurada()) return;
+
+    P.lerImagens().then(function (r) {
+      if (!r || r.ok !== true) {
+        if (window.console && console.warn) {
+          console.warn('[cardapio] imagens da planilha:', r && r.erro);
+        }
+        return;
+      }
+      /* Nao chamamos render() aqui de proposito: aplicarImagens
+         usa Store.alterar, que ja avisa os assinantes e repinta. */
+      P.aplicarImagens(r.imagens);
+    });
   }
 
   if (document.readyState === 'loading') {

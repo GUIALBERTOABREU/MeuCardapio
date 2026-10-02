@@ -225,6 +225,32 @@ funcionando.
 O botão **Enviar cardápio agora** grava a aba `Cardápio` com o catálogo inteiro.
 Ele **sobrescreve** essa aba: ela é o estado atual do cardápio, não histórico.
 
+### Imagens vindas da planilha
+
+Ao abrir o cardápio, o `index.html` busca a coluna **Link da imagem** da aba
+`Cardápio` e troca os links dos itens no lugar. O cardápio aparece na hora com o
+que está no `cardapio.json`; se a planilha responder, os links são atualizados em
+segundo plano e a tela repinta sozinha.
+
+O caminho é **JSONP**, não um `fetch`: o ContentService do Apps Script não manda
+cabeçalhos CORS, então uma leitura comum seria barrada pelo navegador. Com JSONP o
+navegador executa um `<script>` de outra origem, e o script responde chamando uma
+função que o cardápio criou antes. O preço é que esse texto roda como código na
+origem do site — por isso o script recorta o nome do callback para `[A-Za-z0-9_$]`
+e exige o mesmo `TOKEN` da escrita.
+
+Detalhes que importam:
+
+- A leitura tem **tempo limite de 6 segundos**. Um Web App publicado errado não
+  segura o cardápio em "carregando".
+- A leitura só vale para quem tem a URL configurada. Sem URL, nada muda.
+- Quem não responde é o **nome do item e da categoria**, com acento removido dos
+  dois lados. Item sem imagem na planilha continua usando o emoji da categoria.
+- Renomear um item no painel e na planilha ao mesmo tempo não quebra: a linha sem
+  correspondência é ignorada.
+- Como o link da planilha sobrescreve o campo do item, o `cardapio.json` que você
+  baixa do painel **já vem com os links da planilha**.
+
 ### O que aparece na planilha
 
 | Aba | Conteúdo | Como escreve |
@@ -266,8 +292,8 @@ continua podendo ler e apagar a planilha.
 - Free do Google: 20 mil células por dia numa conta, bem acima do volume de uma
   lanchonete. O limite real costuma ser o do próprio navegador.
 - Se o cardápio for aberto direto do `file://` (dois cliques), o envio para a
-  planilha **não funciona** — o navegador bloqueia a chamada. Publique em algum
-  lugar com `http://` para isso passar a valer.
+  planilha **não funciona** — o navegador bloqueia a chamada. A leitura das
+  imagens também não. Publique em algum lugar com `http://` para isso passar a valer.
 - A planilha grava os dados que o cliente digita (nome, endereço, pagamento).
   Sai da sua máquina e vai para uma conta do Google: vale avisar na descrição do
   cardápio que as informações são usadas para o pedido.

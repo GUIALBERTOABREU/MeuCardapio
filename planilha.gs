@@ -74,12 +74,103 @@ function doPost(e) {
   return responder({ ok: true, abas: resumo });
 }
 
-/** GET só serve para confirmar que o Web App está no ar. */
-function doGet() {
-  return responder({
-    ok: true,
-    mensagem: 'Cardápio digital conectado. Não é preciso abrir esta URL no navegador.'
-  });
+/**
+ * GET serve para duas coisas:
+ *
+ *   ?callback=nome   devolve os links de imagem da aba Cardápio
+ *                    embrulhados em `nome({...})` — é JSONP
+ *   sem callback     só confirma que o Web App está no ar
+ *
+ * Por que JSONP e não um fetch normal? O ContentService do Apps
+ * Script não manda cabeçalhos CORS, então um GET com fetch seria
+ * barrado pelo navegador. O JSONP contorna isso: o navegador não
+ * bloqueia <script> de outra origem, e a resposta é executada
+ * como função dentro da nossa página.
+ *
+ * O preço disso é que o JSONP roda como código na origem do site.
+ * Por isso validamos o nome do callback e exigimos o mesmo TOKEN
+ * da escrita quando ele estiver configurado.
+ */
+function doGet(e) {
+  var parametro = (e && e.parameter) || {};
+
+  if (!parametro.callback) {
+    return responder({
+      ok: true,
+      mensagem: 'Cardápio digital conectado. Não é preciso abrir esta URL no navegador.'
+    });
+  }
+
+  /* O callback vai colado no código executado. Aceitar qualquer
+     caractere aqui permitiria injetar JavaScript arbitrário. */
+  var callback = String(parametro.callback).replace(/[^A-Za-z0-9_$]/g, '');
+  if (!callback) return responder({ ok: false, erro: 'Callback inválido.' });
+
+  if (TOKEN && String(parametro.token || '') !== TOKEN) {
+    return responderJsonp(callback, { ok: false, erro: 'Token inválido.' });
+  }
+
+  var links;
+
+  try {
+    links = lerLinksImagem();
+  } catch (erro) {
+    registrar('erro', 'leitura de imagens: ' + erro.message);
+    return responderJsonp(callback, { ok: false, erro: erro.message });
+  }
+
+  return responderJsonp(callback, { ok: true, imagens: links });
+}
+
+/**
+ * Lê a coluna "Link da imagem" da aba Cardápio.
+ * A chave é "categoria|nome" para não confundir itens de mesmo
+ * nome em categorias diferentes — o cardápio tem "Batata Frita"
+ * em dois lugares com nomes iguais.
+ */
+function lerLinksImagem() {
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = planilha.getSheetByName(ABA_CARDAPIO);
+
+  if (!aba || aba.getLastRow() < 2) return {};
+
+  var cabecalho = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+  var colCategoria = cabecalho.indexOf('Categoria') + 1;
+  var colItem = cabecalho.indexOf('Item') + 1;
+  var colLink = cabecalho.indexOf('Link da imagem') + 1;
+
+  if (!colItem || !colLink) return {};
+
+  var ultima = aba.getLastRow();
+
+  /* Só as três colunas necessárias: ler a aba inteira gastaria
+     cota do Google à toa numa planilha grande. */
+  var valores = aba.getRange(2, 1, ultima - 1, cabecalho.length).getValues();
+  var mapa = {};
+
+  for (var i = 0; i < valores.length; i++) {
+    var linha = valores[i];
+    var link = String(linha[colLink - 1] || '').trim();
+    if (!/^https?:\/\/\S+$/i.test(link)) continue;
+
+    var categoria = colCategoria ? String(linha[colCategoria - 1] || '').trim() : '';
+    var item = String(linha[colItem - 1] || '').trim();
+    if (!item) continue;
+
+    mapa[categoria + '|' + item] = link;
+  }
+
+  return mapa;
+}
+
+/**
+ * Empacota o JSON numa chamada de função. É o truque do JSONP:
+ * o texto devolvido precisa ser JavaScript válido, não JSON puro.
+ */
+function responderJsonp(callback, objeto) {
+  return ContentService
+    .createTextOutput(callback + '(' + JSON.stringify(objeto) + ');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 /* ------------------------------------------------------------------
