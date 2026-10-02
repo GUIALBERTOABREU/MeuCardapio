@@ -20,6 +20,6 @@
    ========================================================================= */
 
 window.CardapioSite = {
-  planilhaUrl: 'https://docs.google.com/spreadsheets/d/1Won9PS67k-Pm1l_qF8X3TNsy2tgcph61IDcsu4a1yJU',
+  planilhaUrl: 'https://docs.google.com/spreadsheets/d/1Won9PS67k-Pm1l_qF8X3TNsy2tgcph61IDcsu4a1yJU/edit?usp=sharing',
   planilhaToken: ''
 };
