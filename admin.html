@@ -13,10 +13,11 @@
 
   <!-- ================= LOGIN ================= -->
   <!-- Fica escondido por padrão: o painel só o mostra quando não há
-       sessão salva. Não é <main> de propósito — a <main> do painel
-       abaixo é a única região principal da página, o que mantém a
-       estrutura coerente nas duas telas. -->
-  <div class="container login-caixa oculto" id="telaLogin">
+       sessão salva. É <main> para que a tela de login também tenha
+       uma região principal. Como os dois <main> nunca ficam
+       visíveis ao mesmo tempo, a regra de "uma <main> por página"
+       continua valendo nas duas telas. -->
+  <main class="container login-caixa oculto" id="telaLogin">
     <div class="painel">
       <h1 style="margin:0 0 4px;font-size:1.3rem;letter-spacing:-.02em">⚙️ Painel do Cardápio</h1>
       <p class="dica" style="margin:0 0 20px;color:var(--texto-suave);font-size:.9rem">
@@ -32,7 +33,7 @@
         <p class="dica centro" id="loginDica" style="margin:0"></p>
       </div>
     </div>
-  </div>
+  </main>
 
   <!-- ================= PAINEL ================= -->
   <div class="oculto" id="telaAdmin">
@@ -58,6 +59,13 @@
         <button class="aba-admin" role="tab" data-tab="config" aria-selected="false" aria-controls="tabConfig" tabindex="-1">Configurações</button>
         <button class="aba-admin" role="tab" data-tab="json" aria-selected="false" aria-controls="tabJson" tabindex="-1">Arquivo JSON</button>
       </div>
+
+      <!-- Aviso de publicação. Fica logo abaixo das abas, e não
+           dentro da aba de configurações, porque quem edita item
+           e preço é a aba "Itens" — um aviso escondido ali seria
+           ignorado na hora do erro. role="status" para o leitor de
+           tela anunciar assim que o texto mudar. -->
+      <p id="avisoPublicar" class="aviso-publicar oculto" role="status"></p>
 
       <!-- ---------- ABA ITENS ---------- -->
       <section id="tabItens" role="tabpanel" aria-label="Itens e categorias">
@@ -137,18 +145,20 @@
         <div class="painel">
           <div class="painel-topo"><h2>Planilha Google Sheets</h2></div>
           <p class="dica" style="margin:0 0 14px;color:var(--texto-suave);font-size:.88rem">
-            Cada pedido vira uma linha em <code>Pedidos</code> e uma linha por item em
-            <code>Itens</code>; o cardápio inteiro vira a aba <code>Cardápio</code>, com a
-            coluna <code>Link da imagem</code> — o mesmo endereço cadastrado em
-            <em>Editar item → Link da imagem</em>, já clicável na planilha.
-            O script que faz a gravação está em <code>planilha.gs</code> — cole no Google Sheets,
-            publique como Web App e cole a URL aqui. Sem isso, o WhatsApp continua funcionando.
+            <strong>A planilha é a fonte da verdade.</strong> A página do cliente monta o cardápio
+            de lá: categorias, itens, preços, destaques, imagens e os dados da loja. O que você
+            edita aqui só chega ao cliente depois de <em>Enviar cardápio agora</em>.
+            <br><br>
+            Cada pedido continua virando uma linha em <code>Pedidos</code> e uma linha por item em
+            <code>Itens</code>. O script que faz a gravação está em <code>planilha.gs</code> — cole
+            no Google Sheets, publique como Web App e cole a URL aqui. Sem isso, o WhatsApp
+            continua funcionando e o cardápio mostra a última versão guardada neste navegador.
           </p>
           <div class="campo">
             <label for="cfgPlanilhaUrl">URL do Web App</label>
             <input type="url" id="cfgPlanilhaUrl" inputmode="url" spellcheck="false"
                    placeholder="https://script.google.com/macros/s/AKfy.../exec">
-            <span class="dica">Começa com <code>https://script.google.com/macros/s/</code> e termina em <code>/exec</code>.</span>
+            <span class="dica">Começa com <code>https://script.google.com/macros/s/</code> e termina em <code>/exec</code>. Pode colar a URL inteira, mesmo com <code>?callback=…&amp;token=…</code> no final: esses dois parâmetros são removidos antes da chamada.</span>
           </div>
           <div class="grade-2" style="margin-top:14px">
             <div class="campo">
@@ -157,10 +167,17 @@
               <span class="dica">Se você preencher <code>TOKEN</code> no script, repita o mesmo valor aqui. Sem ele, qualquer pessoa com a URL consegue escrever na sua planilha.</span>
             </div>
             <div class="campo" style="justify-content:flex-end;gap:10px;flex-wrap:wrap">
-              <button type="button" class="btn btn-contorno" id="btnEnviarCardapio">⬆ Enviar cardápio agora</button>
-              <button type="button" class="btn btn-primario" id="btnTestarPlanilha">Testar conexão</button>
+              <button type="button" class="btn btn-contorno" id="btnLerPlanilha">⬇ Buscar da planilha</button>
+              <button type="button" class="btn btn-primario" id="btnEnviarCardapio">⬆ Enviar cardápio agora</button>
+              <button type="button" class="btn btn-contorno" id="btnTestarPlanilha">Testar conexão</button>
             </div>
           </div>
+          <p class="dica" style="margin:14px 0 0;color:var(--texto-suave);font-size:.88rem">
+            O botão de envio é em <code>no-cors</code>: o navegador não consegue ler a resposta do
+            Google, então a confirmação de verdade é ver a aba <code>Registro</code> do script.
+            <em>Buscar da planilha</em> usa JSONP e devolve o que está publicado — é por ele que
+            o painel enxerga as alterações feitas direto no Google.
+          </p>
           <div id="resultadoPlanilha" style="margin-top:14px"></div>
         </div>
 
@@ -187,8 +204,12 @@
         <div class="painel">
           <div class="painel-topo"><h2>Salvar e carregar</h2></div>
           <p class="dica" style="margin:0 0 16px;color:var(--texto-suave);font-size:.9rem">
-            O cardápio inteiro fica em um arquivo <code>cardapio.json</code>.
+            O cardápio inteiro vira um arquivo <code>cardapio.json</code>.
             Baixe para guardar um backup, imprimir cardápio ou mover para outro site.
+            <br><br>
+            O arquivo é só um backup: a página do cliente <strong>não</strong> o busca mais.
+            O que o cliente vê vem da planilha do Google, ou do que este navegador guardou se
+            a planilha não estiver configurada.
           </p>
           <div class="grade-3">
             <button type="button" class="btn btn-primario" id="btnExportar">⬇ Baixar cardapio.json</button>
@@ -215,7 +236,7 @@
 
     <footer class="rodape">
       <div class="container">
-        <p>Alterações são salvas automaticamente neste navegador.</p>
+        <p>Alterações são salvas neste navegador e passam a valer para o cliente depois de publicadas na planilha.</p>
         <div class="rodape-links">
           <a href="index.html">Ir para o cardápio</a>
         </div>

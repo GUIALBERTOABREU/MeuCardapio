@@ -489,12 +489,97 @@
   /* =========================================================
      Aba: Google Sheets
      ========================================================= */
+
+  /* ---------- buscar da planilha ----------
+     A planilha e a fonte da verdade, entao o painel abre mostrando
+     o que esta publicado la — e nao o que sobrou neste navegador.
+
+     So nao sobrescreve sozinho quando o dono tem edicao sem
+     publicar: perder preco corrigido na pressa, sem nenhum aviso,
+     seria o pior defeito possivel num painel que "salva sozinho".
+     Nesse caso o painel diz o que achou e espera o clique, que
+     ainda pede confirmacao. */
+  function buscarPlanilha(forcar) {
+    var P = window.CardapioPlanilha;
+
+    if (!P || !P.configurada()) {
+      if (forcar) avisar('Cole a URL do Web App primeiro.', 'erro');
+      return;
+    }
+
+    var botao = el.btnLerPlanilha;
+    botao.disabled = true;
+    el.resultadoPlanilha.textContent = 'Buscando o que está publicado…';
+
+    P.lerCardapio().then(function (r) {
+      botao.disabled = false;
+
+      if (!r || r.ok !== true) {
+        var msg = (r && r.erro) || 'Resposta inesperada do script.';
+        el.resultadoPlanilha.textContent = 'Não foi possível ler: ' + msg;
+        if (window.console && console.warn) console.warn('[cardapio] planilha:', msg);
+        return;
+      }
+
+      var previa = P.comparar(r);
+      var temEdicaoLocal = P.pendentes();
+
+      /* A aba ainda nao foi publicada: nao ha o que buscar, e o
+         que esta na tela e o unico cardapio que existe. */
+      if (!previa.categorias && !previa.muda) {
+        el.resultadoPlanilha.textContent = temEdicaoLocal
+          ? 'A planilha ainda não tem cardápio publicado. O que está na tela nunca foi enviado.'
+          : 'A planilha ainda não tem cardápio publicado. Clique em "Enviar cardápio agora" para gravar o que está na tela.';
+        return;
+      }
+
+      /* Planilha igual a tela: o que estava marcado como publicado
+         pode estar velho (outro navegador publicou, ou o painel foi
+         aberto em outra maquina). Aqui a marcacao se corrige. */
+      if (!previa.muda) {
+        P.marcarPublicado();
+        renderTudo();
+        el.resultadoPlanilha.textContent = 'A planilha está igual ao que já estava na tela.';
+        return;
+      }
+
+      if (temEdicaoLocal && !forcar) {
+        el.resultadoPlanilha.textContent =
+          'A planilha tem um cardápio diferente do que está na tela, e você tem alterações que não publicou. ' +
+          'Nada foi trocado: clique em "Buscar da planilha" para decidir.';
+        return;
+      }
+
+      /* Trocar agora descarta o que foi digitado aqui, e o painel
+         nao tem como desfazer: so volta o que estiver na planilha
+         ou num JSON baixado antes. */
+      if (temEdicaoLocal && !confirm(
+        'Você tem alterações que não publicou. Buscar da planilha vai substituir o que está na tela por ' +
+        previa.categorias + ' categoria(s) e ' + previa.itens + ' item(ns) da planilha. Continuar?'
+      )) {
+        el.resultadoPlanilha.textContent = 'Nada foi alterado.';
+        return;
+      }
+
+      var m = P.aplicarCardapio(r);
+      P.marcarPublicado();
+      renderTudo();
+
+      el.resultadoPlanilha.textContent = 'Planilha lida: ' + m.categorias + ' categoria(s), ' +
+        m.itens + ' item(ns). O painel agora mostra o que está publicado.';
+    }, function (erro) {
+      botao.disabled = false;
+      el.resultadoPlanilha.textContent = erro.message;
+    });
+  }
+
   function ligarPlanilha() {
     var P = window.CardapioPlanilha;
 
     if (!P) {
       el.btnEnviarCardapio.disabled = true;
       el.btnTestarPlanilha.disabled = true;
+      el.btnLerPlanilha.disabled = true;
       return;
     }
 
@@ -502,6 +587,8 @@
       avisar('Cole a URL do Web App primeiro.', 'erro');
       el.cfgPlanilhaUrl.focus();
     }
+
+    el.btnLerPlanilha.addEventListener('click', function () { buscarPlanilha(true); });
 
     el.btnEnviarCardapio.addEventListener('click', function () {
       if (!P.configurada()) return semUrl();
@@ -512,8 +599,10 @@
 
       P.enviarCardapio().then(function (r) {
         botao.disabled = false;
-        el.resultadoPlanilha.textContent = r.itens + ' item(ns) enviados. Confira a aba "Cardápio" em alguns segundos.';
+        el.resultadoPlanilha.textContent = r.itens + ' item(ns) enviados para a aba "Cardápio" e ' +
+          P.camposConfig.length + ' configurações para a aba "Config". Confira o "Registro" em alguns segundos.';
         avisar(r.itens + ' itens enviados para a planilha ✅', 'ok');
+        renderTudo();
       }, function (erro) {
         botao.disabled = false;
         el.resultadoPlanilha.textContent = erro.message;
@@ -806,6 +895,56 @@
     renderListas();
     if (abaAtual === 'config') preencherConfig();
     if (abaAtual === 'json') el.textareaJson.value = Store.serializar();
+    renderAvisoPublicar();
+  }
+
+  /* O aviso fica entre as abas, e nao dentro da aba de
+     configuracoes: quem mexe em item e preco esta na aba "Itens" e
+     precisa ver o lembrete ali. Nao aparece antes do primeiro
+     envio/busca, porque "sem registro do que foi publicado" nao
+     significa "existe mudanca". */
+  function renderAvisoPublicar() {
+    var P = window.CardapioPlanilha;
+    var aviso = el.avisoPublicar;
+
+    if (!aviso || el.telaAdmin.classList.contains('oculto')) return;
+
+    if (!P || !P.configurada()) {
+      aviso.classList.add('oculto');
+      aviso.textContent = '';
+      return;
+    }
+
+    if (!P.pendentes()) {
+      aviso.classList.add('oculto');
+      aviso.textContent = '';
+      return;
+    }
+
+    aviso.classList.remove('oculto');
+    aviso.textContent = '';
+
+    var texto = document.createTextNode('O cliente ainda não está vendo estas alterações — ');
+    var forte = document.createElement('b');
+    forte.textContent = 'publique na planilha';
+
+    aviso.appendChild(texto);
+    aviso.appendChild(forte);
+
+    var botao = document.createElement('button');
+    botao.type = 'button';
+    botao.className = 'btn btn-primario btn-sm';
+    botao.textContent = '⬆ Enviar cardápio agora';
+    botao.addEventListener('click', function () {
+      /* O aviso pode estar na aba "Itens" ou "JSON", onde o botao
+         de verdade nao esta visivel. Trocar de aba e mover o foco
+         para ele evita um clique que nao parece fazer nada — e o
+         leitor de tela anuncia a mudanca de contexto. */
+      trocarAba('config');
+      if (el.btnEnviarCardapio) el.btnEnviarCardapio.focus();
+    });
+
+    aviso.appendChild(botao);
   }
 
   /* =========================================================
@@ -859,8 +998,10 @@
       cfgPlanilhaUrl: $('#cfgPlanilhaUrl'),
       cfgPlanilhaToken: $('#cfgPlanilhaToken'),
       btnEnviarCardapio: $('#btnEnviarCardapio'),
+      btnLerPlanilha: $('#btnLerPlanilha'),
       btnTestarPlanilha: $('#btnTestarPlanilha'),
-      resultadoPlanilha: $('#resultadoPlanilha')
+      resultadoPlanilha: $('#resultadoPlanilha'),
+      avisoPublicar: $('#avisoPublicar')
     };
 
     if (Admin.temSessao()) {
@@ -878,6 +1019,19 @@
       if (!el.telaAdmin.classList.contains('oculto')) renderTudo();
     });
     renderTudo();
+
+    /* A planilha e a fonte da verdade, entao o painel abre mostrando
+       o que esta publicado la. A leitura espera o painel existir
+       (e so substitui o que ja esta na tela quando nao ha edicao
+       local sem publicar) — ver buscar(), em ligarPlanilha.
+
+       So nao acontece antes do login: quem esta na tela de senha
+       nao tem por que ver o cardapio do dono nem disparar uma
+       chamada ao Google. */
+    if (Admin.temSessao()) {
+      var P = window.CardapioPlanilha;
+      if (P && P.configurada()) buscarPlanilha(false);
+    }
   }
 
   if (document.readyState === 'loading') {

@@ -410,17 +410,6 @@
     return normalizar(SEED).data;
   }
 
-  function temDadosSalvos() {
-    var bruto = storage.get(STORAGE_KEY);
-    if (!bruto) return false;
-    try {
-      var parsed = JSON.parse(bruto);
-      return !!(parsed && typeof parsed === 'object');
-    } catch (e) {
-      return false;
-    }
-  }
-
   function carregar() {
     var bruto = storage.get(STORAGE_KEY);
 
@@ -444,40 +433,23 @@
   /* ---------------------------------------------------------
      5b. Inicializacao
      Ordem de prioridade do cardapio:
-       1) o que foi salvo neste navegador (edicoes do painel)
-       2) o arquivo cardapio.json ao lado das paginas
+       1) o que a planilha do Google devolver (a fonte da verdade)
+       2) o que foi salvo neste navegador, de uma visita anterior
        3) o exemplo embutido neste arquivo
 
-     O passo 1/3 e sincrono, para a pagina aparecer sem
-     esperar a rede. Se o cardapio.json chegar depois, os
-     assinantes sao avisados e a tela se atualiza sozinha.
+     O passo 2/3 e sincrono, para a pagina aparecer sem
+     esperar a rede. Quem traz a planilha e o planilha.js, depois
+     que o app ja pintou — se ela responder, os assinantes sao
+     avisados e a tela se atualiza sozinha.
+
+     O cardapio.json NAO entra mais nesta lista. Ele continua
+     existindo como backup para o dono baixar, mas a pagina nao
+     o busca: cardapio publico sao dois lugares para o mesmo dado
+     divergeirem, e o cliente nunca veria a edicao do painel.
      --------------------------------------------------------- */
   function iniciar() {
-    var jaTinhaSalvo = temDadosSalvos();
-
-    /* ja deixa um cardapio em memoria: pintura imediata */
     carregar();
-
-    if (jaTinhaSalvo || !global.fetch || global.location.protocol === 'file:') {
-      return Promise.resolve(estado);
-    }
-
-    return fetch('cardapio.json', { cache: 'no-cache' })
-      .then(function (res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function (json) {
-        if (!json || !Array.isArray(json.categorias)) throw new Error('formato invalido');
-        estado = normalizar(json).data;
-        storage.set(STORAGE_KEY, JSON.stringify(estado));
-        console.info('[cardapio] cardapio.json carregado.');
-        notificar();
-        return estado;
-      })
-      .catch(function () {
-        return estado; /* sem o arquivo: segue com o exemplo embutido */
-      });
+    return Promise.resolve(estado);
   }
 
   function dados() {

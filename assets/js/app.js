@@ -825,8 +825,8 @@
     };
 
     /* Store.iniciar() monta o cardapio em memoria na hora
-       (pintura imediata) e avisa depois se o cardapio.json
-       da pasta for mais recente. */
+       (pintura imediata), vinda do navegador ou do exemplo
+       embutido. A planilha entra depois, em carregarPlanilha. */
     carregarCarrinho();
     Store.iniciar();
     ligarEventos();
@@ -836,28 +836,39 @@
 
     /* Depois da primeira pintura, para nao travar a abertura
        esperando o Google responder. */
-    carregarImagens();
+    carregarPlanilha();
   }
 
-  /* ---------- imagens vindas da planilha ----------
-     O Apps Script nao devolve cabecalho CORS, entao a leitura usa
-     JSONP (planilha.js). O cardapio ja aparece com o que tem no
-     cardapio.json; se a planilha responder, os links de imagem
-     trocam no lugar. */
-  function carregarImagens() {
+  /* ---------- cardapio publicado na planilha ----------
+     A planilha do Google e a fonte da verdade: categorias,
+     itens, precos, destaques, imagens e os dados da loja. O
+     Apps Script nao devolve cabecalho CORS, entao a leitura usa
+     JSONP (planilha.js).
+
+     A tela ja aparece com o que o navegador tinha guardado, e a
+     planilha troca tudo no lugar quando responde. Se ela falhar,
+     o menu continua aparecendo — e so um aviso no console, porque
+     um cardapio vazio seria pior do que um cardapio antigo. */
+  function carregarPlanilha() {
     var P = window.CardapioPlanilha;
     if (!P || !P.configurada()) return;
 
-    P.lerImagens().then(function (r) {
+    P.lerCardapio().then(function (r) {
       if (!r || r.ok !== true) {
         if (window.console && console.warn) {
-          console.warn('[cardapio] imagens da planilha:', r && r.erro);
+          console.warn('[cardapio] leitura da planilha:', r && r.erro);
         }
         return;
       }
-      /* Nao chamamos render() aqui de proposito: aplicarImagens
-         usa Store.alterar, que ja avisa os assinantes e repinta. */
-      P.aplicarImagens(r.imagens);
+
+      var m = P.aplicarCardapio(r);
+      if (!m.alterados) return;
+
+      /* Renomear item na planilha muda o id dele, e o id gravado
+         no carrinho de quem estava na pagina deixa de existir.
+         Podar de novo e repintar limpa essa lista. */
+      podarCarrinho();
+      render();
     });
   }
 

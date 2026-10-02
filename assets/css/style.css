@@ -887,6 +887,26 @@ textarea { resize: vertical; min-height: 76px; }
 .estat b { display: block; font-size: 1.5rem; font-weight: 800; color: var(--primaria-texto); line-height: 1.2; }
 .estat span { font-size: .78rem; color: var(--texto-suave); }
 
+/* Aviso de "voce editou mas nao publicou".
+   A borda esquerda e a unica coisa diferente do aviso normal de
+   erro: precisa parecer um lembrete, nao uma falha. O texto sobre
+   o aviso continua com a cor padrao para nao perder o contraste. */
+.aviso-publicar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-left: 4px solid var(--primaria);
+  border-radius: var(--raio-sm);
+  font-size: .92rem;
+}
+.aviso-publicar b { font-weight: 800; }
+.aviso-publicar .btn { margin-left: auto; }
+
 @media (max-width: 560px) {
   /* a busca desce para a propria linha: sobra espaco para o nome */
   .topo-principal { gap: 10px; }
