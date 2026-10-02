@@ -407,6 +407,15 @@
      ========================================================= */
   function preencherConfig() {
     var c = Store.dados().config;
+    var P = window.CardapioPlanilha;
+
+    /* Reavalia o aviso do planilha-site.js: o dono pode ter acabado de
+       colar a URL, e o aviso precisa sumir assim que ele fizer isso. */
+    if (P && el.avisoSite) {
+      if (!P.configurada() || P.siteConfigurado()) el.avisoSite.classList.add('oculto');
+      else el.avisoSite.classList.remove('oculto');
+    }
+
     el.cfgNome.value = c.nome;
     el.cfgWhatsapp.value = c.whatsapp;
     el.cfgDescricao.value = c.descricao;
@@ -589,6 +598,29 @@
     }
 
     el.btnLerPlanilha.addEventListener('click', function () { buscarPlanilha(true); });
+
+    /* O painel funciona com a URL so no localStorage dele, mas o
+       cliente nao tem como saber a URL: a dele nunca passou por este
+       painel. Ela precisa estar no arquivo planilha-site.js, que vai
+       junto com o site. Sem esse aviso, o dono configura tudo, publica,
+       e o cliente segue vendo o exemplo — sem nenhuma pista do porque. */
+    function avisarSite() {
+      var P2 = window.CardapioPlanilha;
+      if (!P2 || !P2.configurada() || P2.siteConfigurado()) return;
+
+      var alvo = el.avisoSite;
+      if (!alvo) return;
+
+      alvo.classList.remove('oculto');
+      alvo.querySelector('[data-site-url]').textContent = cfgOuVazio();
+    }
+
+    function cfgOuVazio() {
+      var c = Store.dados().config;
+      return c.planilhaUrl || '(vazio)';
+    }
+
+    if (P.configurada() && !P.siteConfigurado()) avisarSite();
 
     el.btnEnviarCardapio.addEventListener('click', function () {
       if (!P.configurada()) return semUrl();
@@ -1001,7 +1033,8 @@
       btnLerPlanilha: $('#btnLerPlanilha'),
       btnTestarPlanilha: $('#btnTestarPlanilha'),
       resultadoPlanilha: $('#resultadoPlanilha'),
-      avisoPublicar: $('#avisoPublicar')
+      avisoPublicar: $('#avisoPublicar'),
+      avisoSite: $('#avisoSite')
     };
 
     if (Admin.temSessao()) {

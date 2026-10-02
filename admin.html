@@ -164,7 +164,7 @@
             <div class="campo">
               <label for="cfgPlanilhaToken">Token do script</label>
               <input type="text" id="cfgPlanilhaToken" spellcheck="false" placeholder="Deixe vazio se não configurou">
-              <span class="dica">Se você preencher <code>TOKEN</code> no script, repita o mesmo valor aqui. Sem ele, qualquer pessoa com a URL consegue escrever na sua planilha.</span>
+              <span class="dica">O mesmo valor que você pôs em <code>var TOKEN</code> no <code>planilha.gs</code>. Sem ele, qualquer pessoa com a URL consegue escrever na sua planilha.</span>
             </div>
             <div class="campo" style="justify-content:flex-end;gap:10px;flex-wrap:wrap">
               <button type="button" class="btn btn-contorno" id="btnLerPlanilha">⬇ Buscar da planilha</button>
@@ -177,6 +177,13 @@
             Google, então a confirmação de verdade é ver a aba <code>Registro</code> do script.
             <em>Buscar da planilha</em> usa JSONP e devolve o que está publicado — é por ele que
             o painel enxerga as alterações feitas direto no Google.
+          </p>
+
+          <p id="avisoSite" class="aviso-publicar oculto" role="status" style="margin-top:14px">
+            O cliente não está lendo a planilha. Copie esta URL para
+            <code>assets/js/planilha-site.js</code> (<code>planilhaUrl</code>) e publique o site de
+            novo. URL configurada aqui: <b data-site-url></b>. O token, se usado, vai no mesmo
+            arquivo em <code>planilhaToken</code>.
           </p>
           <div id="resultadoPlanilha" style="margin-top:14px"></div>
         </div>

@@ -53,12 +53,35 @@
   /* ---------------------------------------------------------
      1. Utilidades
      --------------------------------------------------------- */
+  /* O URL da planilha nao cabe na planilha — seria circular: preciso
+     dele para ler a planilha. E nao cabe no localStorage, que e por
+     navegador: o cliente chega no site pela primeira vez e nunca
+     preencheu nada.
+
+     Entao o endereco viaja no proprio site, em planilha-site.js. O
+     painel sobrescreve com o que esta no localStorage dele, que e o
+     mesmo par — assim quem testa na maquina ve a planilha mesmo
+     sem ter publicado o arquivo de configuracao. */
   function cfg() {
-    return (window.CardapioStore && window.CardapioStore.dados().config) || {};
+    var base = (window.CardapioStore && window.CardapioStore.dados().config) || {};
+    var doSite = (window.CardapioSite && typeof window.CardapioSite === 'object') ? window.CardapioSite : {};
+
+    return {
+      planilhaUrl: base.planilhaUrl || doSite.planilhaUrl || '',
+      planilhaToken: base.planilhaToken || doSite.planilhaToken || ''
+    };
   }
 
   function configurada() {
     return !!cfg().planilhaUrl;
+  }
+
+  /* O cliente vai conseguir ler a planilha? O painel usa isto para
+     avisar que o arquivo planilha-site.js precisa ser preenchido e
+     publicado — sem isso o cardapio do cliente fica no exemplo. */
+  function siteConfigurado() {
+    var s = (window.CardapioSite && typeof window.CardapioSite === 'object') ? window.CardapioSite : {};
+    return !!(String(s.planilhaUrl || '').trim());
   }
 
   /* A URL que a gente publica no painel é a do POST:
@@ -726,6 +749,7 @@
     tabelaConfig: tabelaConfig,
     ultimoEnvio: ultimoEnvio,
     enderecosDeImagem: enderecosDeImagem,
+    siteConfigurado: siteConfigurado,
     cabecalhos: {
       pedidos: CABECALHO_PEDIDOS,
       itens: CABECALHO_ITENS,
