@@ -61,9 +61,66 @@
     return achado;
   }
 
+  /* Uma imagem que falha nao pode ficar quebrada na tela: o
+     .cartao-foto tem altura fixa, e o resultado e um retangulo
+     vazio do tamanho da foto — que e indistinguivel de um bug do
+     cardapio. Entao cada <img> leva a lista de enderecos a
+     tentar, e um unico listener (o evento error nao sobe, por isso
+     a captura) vai descascando a lista ate sobrar o emoji.
+
+     O no-referrer nao e frescura: boa parte das hospedagens que
+     bloqueiam "roubo de imagem" justamente olhando o Referer. */
   function emojiDoItem(item, categoria) {
-    if (item.imagem) return '<img src="' + esc(item.imagem) + '" alt="" loading="lazy">';
-    return esc((categoria && categoria.icone) || '🍽️');
+    var emoji = esc((categoria && categoria.icone) || '🍽️');
+
+    var enderecos = (window.CardapioPlanilha && window.CardapioPlanilha.enderecosDeImagem)
+      ? window.CardapioPlanilha.enderecosDeImagem(item.imagem)
+      : [];
+
+    if (!enderecos.length) return '<span class="foto-emoji" aria-hidden="true">' + emoji + '</span>';
+
+    return '<img src="' + esc(enderecos[0]) + '" alt="" loading="lazy" decoding="async"' +
+           ' referrerpolicy="no-referrer"' +
+           ' data-restam="' + esc(enderecos.slice(1).join('\n')) + '"' +
+           ' data-emoji="' + emoji + '"' +
+           ' data-item="' + esc(item.nome || '') + '">';
+  }
+
+  /* Um listener so para todas as imagens da pagina, inclusive as do
+     carrinho.(error nao faz bolha, mas pega na fase de captura.) */
+  function ligarImagens() {
+    document.addEventListener('error', function (ev) {
+      var img = ev.target;
+      if (!img || img.tagName !== 'IMG' || !img.dataset) return;
+
+      /* Ainda tem endereco para tentar: vai pro proximo. */
+      var restam = img.getAttribute('data-restam') || '';
+      var proximo = restam.split('\n').filter(Boolean)[0];
+
+      if (proximo) {
+        img.setAttribute('data-restam', restam.split('\n').filter(Boolean).slice(1).join('\n'));
+        img.src = proximo;
+        return;
+      }
+
+      /* Acabaram os enderecos. Troca pelo emoji e diz qual item foi,
+         para o F12 mostrar o motivo em vez de o usuario adivinhar. */
+      var quem = img.getAttribute('data-item') || 'item';
+      var url = img.getAttribute('src') || '';
+      if (window.console && console.warn) {
+        console.warn('[cardapio] imagem nao carregou, usando o emoji: ' + quem + ' <- ' + url);
+      }
+
+      var marca = document.createElement('span');
+      marca.className = 'foto-emoji';
+      /* Decorativo: o nome do item ja vem no <h3> logo abaixo, e
+         repetir o nome aqui faria o leitor de tela falar duas
+         vezes. */
+      marca.setAttribute('aria-hidden', 'true');
+      marca.textContent = img.getAttribute('data-emoji') || '🍽️';
+      if (img.parentNode) img.parentNode.replaceChild(marca, img);
+
+    }, true);
   }
 
   /* ---------- toasts ---------- */
@@ -830,6 +887,7 @@
     carregarCarrinho();
     Store.iniciar();
     ligarEventos();
+    ligarImagens();
     Store.assinar(render);
     podarCarrinho();
     render();

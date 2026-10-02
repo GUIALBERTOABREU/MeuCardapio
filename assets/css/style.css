@@ -342,7 +342,13 @@ main { padding: 24px 0 140px; min-height: 60vh; }
   overflow: hidden;
 }
 .cartao-foto img { width: 100%; height: 100%; object-fit: cover; }
-.cartao-emoji { font-size: 2.6rem; line-height: 1; }
+/* Emoji no lugar da foto, tanto quando o item nunca teve imagem
+   quanto quando a imagem da planilha nao carregou. O .cartao-emoji
+   antigo ficava sem uso: o texto do emoji saia solto no <div>.
+   O tamanho e por container — na linha do carrinho a caixa e de
+   44px e o emoji de 2.6rem transbordaria. */
+.cartao-foto .foto-emoji { font-size: 2.6rem; line-height: 1; }
+.linha-emoji .foto-emoji { font-size: 1.3rem; line-height: 1; }
 
 .selo-destaque {
   position: absolute;

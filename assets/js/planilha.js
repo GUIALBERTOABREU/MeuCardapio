@@ -156,6 +156,49 @@
     return /^https?:\/\/[^\s"'\\<>]+$/i.test(s) ? s : '';
   }
 
+  /* Endereços para tentar, em ordem, até um carregar.
+
+     Devolve uma LISTA porque as duas causas mais comuns de "a
+     imagem não aparece" não se resolvem trocando a URL, e sim
+     experimenando a outra forma dela:
+
+     1. http:// numa pagina https:// — o navegador bloqueia como
+        "mixed content" e a imagem fica permanentemente quebrada,
+        sem recarregar. Quase toda hospedagem aceita https, então
+        tentamos o https primeiro e guardamos o http de reserva
+        para o host que so tem http.
+     2. Link do Google Drive — devolve uma pagina HTML de
+        visualizacao, nao o arquivo. So a forma /uc?export=view
+        entrega os bytes da imagem.
+
+     O que o chamador faz com a lista que sobrar (voltar ao emoji)
+     fica com ele; aqui e so a ordem de tentativa. */
+  function enderecosDeImagem(valor) {
+    var s = linkDeImagem(valor);
+    if (!s) return [];
+
+    var saida = [];
+
+    function Push(u) {
+      if (u && saida.indexOf(u) < 0) saida.push(u);
+    }
+
+    /* Link de visualizacao do Drive -> bytes da imagem. */
+    var drive = /(?:^|\/\/)(?:drive|docs)\.google\.com\//i.exec(s);
+    if (drive) {
+      var id = /[?&]id=([A-Za-z0-9_-]{10,})/.exec(s) ||
+               /\/d\/([A-Za-z0-9_-]{10,})/.exec(s);
+      if (id) {
+        Push('https://drive.google.com/uc?export=view&id=' + id[1]);
+        return saida;
+      }
+    }
+
+    Push(s.replace(/^http:\/\//i, 'https://'));
+    Push(s);
+    return saida;
+  }
+
   /* Preco vai como numero, nao como "18,90": o Sheets precisa
      reconhecer a coluna como dinheiro para somar e filtrar. */
   function dinheiro(valor) {
@@ -682,6 +725,7 @@
     catalogo: catalogo,
     tabelaConfig: tabelaConfig,
     ultimoEnvio: ultimoEnvio,
+    enderecosDeImagem: enderecosDeImagem,
     cabecalhos: {
       pedidos: CABECALHO_PEDIDOS,
       itens: CABECALHO_ITENS,

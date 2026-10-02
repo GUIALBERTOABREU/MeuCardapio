@@ -93,6 +93,9 @@ Na aba **Itens e categorias**:
 - **+ Nova categoria** cria uma categoria (o nome define o atalho no menu)
 - Cada categoria tem **+ Adicionar item**, e cada item tem: nome, descrição,
   preço, foto (por URL), destaque e disponibilidade
+- A foto aceita o link do Google Drive e link `http://`; se a imagem não carregar,
+  o item volta a mostrar o emoji da categoria (veja
+  [Quando a imagem não aparece](#quando-a-imagem-não-aparece))
 - As setas ↑ ↓ mudam a ordem — o menu segue essa mesma ordem
 - A lixeira apaga item ou categoria
 - Dar o mesmo nome em categorias diferentes é permitido: o sistema gera ids
@@ -328,6 +331,39 @@ Detalhes que importam:
 - Link de imagem só entra se for `http://` ou `https://`, sem espaço, aspas ou
   barra invertida. `javascript:` e caminho relativo são descartados.
 
+### Quando a imagem não aparece
+
+Duas formas do mesmo endereço são tentadas, em ordem, antes de o cardápio desistir:
+
+1. **`http://` numa página `https://`.** O navegador bloqueia isso como
+   *mixed content* e a imagem não carrega nunca, nem recarregando. O cardápio tenta
+   o `https://` primeiro e guarda o `http://` de reserva para o servidor que só
+   atende `http`.
+2. **Link do Google Drive.** O link que o Drive dá ("Compartilhar → Copiar link")
+   abre uma página de visualização em HTML, não a imagem. O cardápio reconhece e
+   troca sozinho pelo endereço que entrega o arquivo:
+   `https://drive.google.com/uc?export=view&id=ID`.
+
+Se ainda assim não carregar, o item **volta a mostrar o emoji da categoria** em vez
+de ficar com um retângulo vazio do tamanho da foto. Cada falha aparece no console
+do navegador (F12) com o nome do item e o endereço que falhou:
+
+```
+[cardapio] imagem nao carregou, usando o emoji: X-Burguer <- https://...
+```
+
+Restam duas causas que só o dono da imagem resolve, porque são o servidor recusando
+a imagem para outro site:
+
+- **Proteção contra hotlink.** Muitos sites bloqueiam imagem exibida fora do
+  domínio deles olhando o cabeçalho `Referer`. O cardápio manda `no-referrer` para
+  ajudar, mas o dono precisa liberar a imagem ou hospedá-la em outro lugar.
+- **Link que exige login.** Se a imagem só abre para quem está logado na sua
+  conta, nenhum cliente do cardápio vai vê-la.
+
+Confira o link colando o endereço numa aba anônima, com o site fechado. Se não
+mostrar a imagem aí, o problema é o endereço, não o cardápio.
+
 ### O que aparece na planilha
 
 | Aba | Conteúdo | Como escreve |
@@ -355,6 +391,10 @@ Detalhes que importam:
 A coluna `Icone` se repete em todas as linhas da categoria e vale a primeira que
 estiver preenchida — assim dá para corrigir o emoji em qualquer linha, sem mesclar
 células (que quebrariam a leitura).
+
+A coluna `Link da imagem` aceita o link do Google Drive e link `http://` mesmo
+num site `https://`: o cardápio ajusta o endereço ao carregar. Se a imagem não
+aparecer mesmo assim, veja [Quando a imagem não aparece](#quando-a-imagem-não-aparece).
 
 Editar essas colunas direto no Google muda a tela do cliente no próximo
 carregamento, **sem passar pelo painel**. É o caminho mais curto para corrigir um
