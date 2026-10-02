@@ -35,7 +35,8 @@
   ];
 
   var CABECALHO_CARDAPIO = [
-    'Categoria', 'Item', 'Preco', 'Destaque', 'Disponivel', 'Descricao', 'Atualizado'
+    'Categoria', 'Item', 'Preco', 'Destaque', 'Disponivel', 'Descricao',
+    'Link da imagem', 'Atualizado'
   ];
 
   /* ---------------------------------------------------------
@@ -70,6 +71,15 @@
       .replace(/[^\w\s\-.,:;()\/@+*#]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  }
+
+  /* URL de imagem. O Sheets le "=" no começo da celula como
+     formula e ' como delimitador, entao um link malformado
+     viraria erro em vez de texto. */
+  function linkDeImagem(valor) {
+    var s = String(valor === null || valor === undefined ? '' : valor).trim();
+    if (!s) return '';
+    return s.replace(/"/g, '').replace(/^[=+\-@\t\r]/, '');
   }
 
   /* Preco vai como numero, nao como "18,90": o Sheets precisa
@@ -152,6 +162,11 @@
           /* Descricao costuma ter virgula e ponto: o Sheets abriria
              aspas e comeria o resto da linha. */
           semAcento(item.descricao).replace(/"/g, ''),
+          /* A URL fica crua, sem passar por semAcento: ela e
+             composed de "/" e "?" e "%", que a limpeza de texto
+             apagaria e transformaria o link num caminho quebrado.
+             So sai o que o Sheets interpretaria. */
+          linkDeImagem(item.imagem),
           marca.data + ' ' + marca.hora
         ]);
       });

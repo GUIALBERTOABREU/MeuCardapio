@@ -5,7 +5,8 @@
  *
  *   Pedidos   → uma linha por pedido (fixo, cabeçalho nunca muda)
  *   Itens     → uma linha por item pedido (formato longo, dá pra somar)
- *   Cardápio  → uma linha por item do cardápio (estado atual)
+ *   Cardápio  → uma linha por item do cardápio (estado atual), com
+                a coluna "Link da imagem" já clicável
  *   Registro  → histórico de cada chamada, para depurar
  *
  * Por que "Itens" separada em vez de uma coluna por produto?
@@ -113,6 +114,7 @@ function escreverAba(spec, acao, origem) {
 
   cabecalhoNegrito(aba, cabecalho.length);
   aplicarPrecos(aba, cabecalho);
+  aplicarLinksImagem(aba, cabecalho);
 
   registrar(acao, spec.nome + ' · ' + linhas.length + ' linha(s) · ' + origem);
 
@@ -146,6 +148,52 @@ function aplicarPrecos(aba, cabecalho) {
 
     aba.getRange(2, i + 1, ultima - 1, 1).setNumberFormat('R$ #,##0.00');
   }
+}
+
+/**
+ * A coluna "Link da imagem" vira hyperlink de verdade. setValues
+ * deixa a URL como texto simples, e no Sheets texto simples só
+ * fica clicável depois que alguém digita Enter na célula. Isso
+ * aqui já deixa pronto para clicar direto.
+ *
+ * richTextValues é o que faz a parte clicável. Sem ele, seria
+ * necessário montar =HIPERLINK() e aí quebrava se a URL tivesse
+ * aspas ou espaços.
+ */
+function aplicarLinksImagem(aba, cabecalho) {
+  var coluna = cabecalho.indexOf('Link da imagem') + 1;
+  if (!coluna) return;
+
+  var ultima = aba.getLastRow();
+  if (ultima < 2) return;
+
+  var valores = aba.getRange(2, coluna, ultima - 1, 1)
+                  .getValues()
+                  .map(function (l) { return l[0]; });
+
+  var texto = [];
+  var link = [];
+
+  for (var i = 0; i < valores.length; i++) {
+    var url = String(valores[i] === null ? '' : valores[i]).trim();
+
+    if (!url || !/^https?:\/\/\S+$/i.test(url)) {
+      texto.push('');
+      link.push('');
+      continue;
+    }
+
+    texto.push(url);
+    link.push(url);
+  }
+
+  aba.getRange(2, coluna, ultima - 1, 1)
+     .setRichTextValues(texto.map(function (t, i) {
+       return [{
+         text: t,
+         textLink: link[i] ? { url: link[i] } : null
+       }];
+     }));
 }
 
 /* ------------------------------------------------------------------

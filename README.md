@@ -234,6 +234,11 @@ Ele **sobrescreve** essa aba: ela é o estado atual do cardápio, não históric
 | `Cardápio` | uma linha por item do cardápio | substitui tudo |
 | `Registro` | histórico de cada chamada | acrescenta no fim |
 
+A aba `Cardápio` tem as colunas **Categoria, Item, Preço, Destaque, Disponível,
+Descrição, Link da imagem** e **Atualizado**. O link vem do mesmo campo *Link da
+imagem* do cadastro do item (painel → Itens → Editar) e chega **clicável**, não
+como texto solto.
+
 `Pedidos` tem colunas fixas (data, cliente, tipo, endereço, pagamento, totais).
 Os itens ficam na coluna **Itens do pedido** e também na aba `Itens`, uma linha por
 produto — é essa aba que permite saber quanto saiu de cada item:
