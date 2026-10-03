@@ -1057,12 +1057,65 @@
     });
   }
 
+  /* ---------------------------------------------------------
+     3e. Pedidos (página Gerenciar Pedidos)
+     --------------------------------------------------------- */
+  function lerPedidos() {
+    if (!configurada()) return Promise.reject(new Error('Planilha não configurada.'));
+
+    var url = comParams('');
+
+    return new Promise(function (resolve) {
+      var pronto = false;
+
+      function responder(r) {
+        if (pronto) return;
+        pronto = true;
+        resolve(r);
+      }
+
+      setTimeout(function () {
+        responder({ ok: false, erro: 'Tempo esgotado ao buscar pedidos.' });
+      }, 8000);
+
+      fetch(url, { credentials: 'omit', redirect: 'follow' })
+        .then(function (resp) {
+          if (!resp.ok) {
+            responder({ ok: false, definido: true, erro: 'A planilha respondeu ' + resp.status + '.' });
+            return null;
+          }
+          return resp.json();
+        })
+        .then(function (json) {
+          if (json === null) return;
+          if (!json || json.ok !== true) {
+            responder({ ok: false, definido: true, erro: (json && json.erro) || 'Resposta inesperada do script.' });
+            return;
+          }
+          responder({ ok: true, pedidos: json.pedidos || [] });
+        })
+        .catch(function (e) {
+          responder({ ok: false, erro: 'Falha de rede ao buscar pedidos: ' + (e && e.message ? e.message : e) });
+        });
+    });
+  }
+
+  function alterarStatusPedido(pedido, novoStatus) {
+    if (!configurada()) return Promise.reject(new Error('Planilha não configurada.'));
+
+    return postar('alterarStatus', [
+      { nome: 'Pedidos', modo: 'updateStatus', pedido: pedido, status: novoStatus }
+    ]);
+  }
+
   window.CardapioPlanilha = {
     configurada: configurada,
     enviarPedido: enviarPedido,
     enviarCardapio: enviarCardapio,
     lerCardapio: lerCardapio,
     statusDoPedido: statusDoPedido,
+    lerPedidos: lerPedidos,
+    alterarStatusPedido: alterarStatusPedido,
     aplicarCardapio: aplicarCardapio,
     comparar: comparar,
     pendentes: alteracoesPendentes,

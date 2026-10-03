@@ -103,6 +103,17 @@ function doPost(e) {
     return responder({ ok: false, erro: 'Token inválido.' });
   }
 
+  /* Ação alterarStatus: atualiza o status de um pedido */
+  if (dados.acao === 'alterarStatus') {
+    var abas = dados.abas;
+    if (!Array.isArray(abas) || !abas.length) {
+      return responder({ ok: false, erro: 'Dados de alteração de status não encontrados.' });
+    }
+    var spec = abas[0];
+    var resultado = alterarStatusPedido(spec.pedido, spec.status);
+    return responder(resultado);
+  }
+
   var abas = dados.abas;
 
   if (!Array.isArray(abas) || !abas.length) {
@@ -188,6 +199,11 @@ function doGet(e) {
      desperdício. */
   if (parametro.pedido) {
     return responderLeia(lerStatusPedido(parametro.pedido));
+  }
+
+  /* Lista de pedidos para a página Gerenciar Pedidos. */
+  if (parametro.pedidos) {
+    return responderLeia(lerPedidos());
   }
 
   var menu;
@@ -503,6 +519,97 @@ function lerStatusPedido(id) {
   }
 
   return { ok: true, pedido: alvo, status: '', encontrado: false };
+}
+
+/**
+ * Lê todos os pedidos da aba Pedidos para a página Gerenciar Pedidos.
+ * Devolve uma lista com todos os pedidos, incluindo itens.
+ */
+function lerPedidos() {
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = planilha.getSheetByName(ABA_PEDIDOS);
+
+  if (!aba || aba.getLastRow() < 2) {
+    return { ok: true, pedidos: [] };
+  }
+
+  var cabecalho = aba.getRange(1, 1, 1, Math.max(1, aba.getLastColumn())).getValues()[0];
+  var colPedido = acharColuna(cabecalho, ['Pedido']);
+  var colData = acharColuna(cabecalho, ['Data']);
+  var colHora = acharColuna(cabecalho, ['Hora']);
+  var colCliente = acharColuna(cabecalho, ['Cliente']);
+  var colTipo = acharColuna(cabecalho, ['Tipo']);
+  var colEndereco = acharColuna(cabecalho, ['Endereco']);
+  var colBairro = acharColuna(cabecalho, ['Bairro']);
+  var colPagamento = acharColuna(cabecalho, ['Pagamento']);
+  var colSubtotal = acharColuna(cabecalho, ['Subtotal']);
+  var colTaxa = acharColuna(cabecalho, ['Taxa entrega']);
+  var colTotal = acharColuna(cabecalho, ['TOTAL']);
+  var colObservacoes = acharColuna(cabecalho, ['Observacoes']);
+  var colStatus = acharColuna(cabecalho, ['Status']);
+  var colItens = acharColuna(cabecalho, ['Itens do pedido']);
+
+  if (!colPedido) return { ok: true, pedidos: [] };
+
+  var valores = aba.getRange(2, 1, aba.getLastRow() - 1, cabecalho.length).getValues();
+  var pedidos = [];
+
+  for (var i = 0; i < valores.length; i++) {
+    var linha = valores[i];
+    var pedido = String(linha[colPedido - 1] || '').trim();
+    if (!pedido) continue;
+
+    pedidos.push({
+      pedido: pedido,
+      data: colData ? String(linha[colData - 1] || '').trim() : '',
+      hora: colHora ? String(linha[colHora - 1] || '').trim() : '',
+      cliente: colCliente ? String(linha[colCliente - 1] || '').trim() : '',
+      tipo: colTipo ? String(linha[colTipo - 1] || '').trim() : '',
+      endereco: colEndereco ? String(linha[colEndereco - 1] || '').trim() : '',
+      bairro: colBairro ? String(linha[colBairro - 1] || '').trim() : '',
+      pagamento: colPagamento ? String(linha[colPagamento - 1] || '').trim() : '',
+      subtotal: colSubtotal ? Number(linha[colSubtotal - 1]) || 0 : 0,
+      taxa: colTaxa ? Number(linha[colTaxa - 1]) || 0 : 0,
+      total: colTotal ? Number(linha[colTotal - 1]) || 0 : 0,
+      observacoes: colObservacoes ? String(linha[colObservacoes - 1] || '').trim() : '',
+      status: colStatus ? String(linha[colStatus - 1] || '').trim() || 'Aguardando' : 'Aguardando',
+      itens: colItens ? String(linha[colItens - 1] || '').trim() : ''
+    });
+  }
+
+  return { ok: true, pedidos: pedidos };
+}
+
+/**
+ * Altera o status de um pedido na aba Pedidos.
+ */
+function alterarStatusPedido(pedido, novoStatus) {
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = planilha.getSheetByName(ABA_PEDIDOS);
+
+  if (!aba || aba.getLastRow() < 2) {
+    return { ok: false, erro: 'Aba Pedidos não encontrada.' };
+  }
+
+  var cabecalho = aba.getRange(1, 1, 1, Math.max(1, aba.getLastColumn())).getValues()[0];
+  var colPedido = acharColuna(cabecalho, ['Pedido']);
+  var colStatus = acharColuna(cabecalho, ['Status']);
+
+  if (!colPedido || !colStatus) {
+    return { ok: false, erro: 'Colunas Pedido ou Status não encontradas.' };
+  }
+
+  var valores = aba.getRange(2, 1, aba.getLastRow() - 1, cabecalho.length).getValues();
+
+  for (var i = 0; i < valores.length; i++) {
+    if (String(valores[i][colPedido - 1]).trim() === pedido) {
+      aba.getRange(i + 2, colStatus).setValue(novoStatus);
+      registrar('alterarStatus', 'Pedido ' + pedido + ' → ' + novoStatus);
+      return { ok: true, pedido: pedido, status: novoStatus };
+    }
+  }
+
+  return { ok: false, erro: 'Pedido ' + pedido + ' não encontrado.' };
 }
 
 /* Acha o número da coluna pelo nome, ignorando acento e caixa. Assim
