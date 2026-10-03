@@ -226,13 +226,21 @@ function precoDe(valor) {
 }
 
 /* Mesma regra do linkDeImagem() do navegador, invertida: la
-   removemos aspas e "=" inicial antes de gravar; aqui recusamos o
-   que nao e link, para leitura e escrita concordarem. As aspas nao
-   quebrariam o JSONP (o JSON.stringify escapa), mas a URL morreria
-   no primeiro request. */
+   removemos aspas e "=" inicial antes de gravar; aqui aceitaremos
+   link absoluto http(s) OU caminho relativo (img/arquivo.jpg) para
+   permitir imagens locais junto ao index.html. Caminhos relativos
+   sao retornados como estao para o JSONP; o navegador resolve
+   relativamente ao dominio/arquivo. */
 function linkDe(valor) {
   var s = String(valor === null || valor === undefined ? '' : valor).trim();
-  return /^https?:\/\/[^\s"'\\<>]+$/i.test(s) ? s : '';
+  if (!s) return '';
+  if (/^https?:\/\/[^\s"'\\<>]+$/i.test(s)) return s;
+  if (/^\/\//.test(s)) return 'https:' + s;
+  if (s.indexOf('data:') === 0 || s.indexOf('javascript:') === 0 || s.indexOf('=') === 0) return '';
+  if (s.indexOf('#') === 0 || s.indexOf('..') === 0) return '';
+  if (/[\s"'\\<>]/.test(s)) return '';
+  s = s.replace(/^\.\//, '');
+  return s;
 }
 
 /**

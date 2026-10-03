@@ -176,7 +176,17 @@
      relativo ou um javascript: aceito aqui e recusado lá. */
   function linkDeImagem(valor) {
     var s = String(valor === null || valor === undefined ? '' : valor).trim();
-    return /^https?:\/\/[^\s"'\\<>]+$/i.test(s) ? s : '';
+    if (!s) return '';
+    /* Aceita URL absoluta http(s) ou caminho relativo (pasta local)
+       ao lado do index.html, como img/arquivo.jpg */
+    if (/^https?:\/\//i.test(s)) return s;
+    if (/^\/\//.test(s)) return 'https:' + s;
+    if (s.indexOf('data:') === 0 || s.indexOf('javascript:') === 0 || s.indexOf('=') === 0) return '';
+    if (s.indexOf('#') === 0 || s.indexOf('..') === 0) return '';
+    if (/[\s"'\\<>]/.test(s)) return '';
+    /* caminho relativo: remove ./ se tiver e devolve como esta */
+    s = s.replace(/^\.\//, '');
+    return s;
   }
 
   /* Endereços para tentar, em ordem, até um carregar.
@@ -204,6 +214,14 @@
 
     function Push(u) {
       if (u && saida.indexOf(u) < 0) saida.push(u);
+    }
+
+    /* caminho relativo: nao precisa converter http->https nem Drive;
+       tenta direto (e pode incluir ./ opcionalmente) */
+    if (!/^https?:\/\//i.test(s) && !/^\/\//.test(s)) {
+      Push(s);
+      Push('./' + s);
+      return saida;
     }
 
     /* Link de visualizacao do Drive -> bytes da imagem. */
