@@ -21,5 +21,5 @@
 
 window.CardapioSite = {
   planilhaUrl: 'https://script.google.com/macros/s/AKfycbwLEZbqNOSMqEOc2ReYrD-DvOBSuRR7Sg5b6BNrwG8vAUpeMrRIM1Tfr7G7mOrMjIUeZA/exec',
-  planilhaToken: ''
+  planilhaToken: 'GUIGA9805_LINDO'
 };

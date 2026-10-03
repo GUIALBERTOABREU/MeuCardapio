@@ -81,10 +81,17 @@ Na aba **Configurações**:
 - **Loja aberta/fechada** — fechada, o cliente vê o aviso e não consegue adicionar
   itens
 - **Pedir nome** e **pedir entrega** — ligam ou desligam esses campos no checkout
+- **Formas de pagamento** — lista separada por vírgula (`Dinheiro, Pix, Cartao`) que
+  vira um seletor no checkout
+- **Tempo de entrega** e **tempo de retirada** — a previsão mostrada ao cliente
+  (`30-40 min`), separada por tipo
+- **Endereço da loja** e **Instagram** — aparecem no rodapé do cardápio
+- **Bairros** (aba própria) — taxa e tempo por bairro; quando há bairros cadastrados,
+  o cliente escolhe o dele e a taxa do bairro vence a taxa única
 
-Tudo isso vai para a planilha em **Config** quando você clicar em **Enviar cardápio
-agora**. O painel salva sozinho, mas o cliente só vê depois de publicar — por isso
-existe o aviso em cima das abas.
+Tudo isso vai para a planilha em **Config** (os bairros vão para a aba **Bairros**)
+quando você clicar em **Enviar cardápio agora**. O painel salva sozinho, mas o cliente
+só vê depois de publicar — por isso existe o aviso em cima das abas.
 
 ## Cadastrar itens
 
@@ -103,6 +110,24 @@ Na aba **Itens e categorias**:
 
 Preço aceita `12,50`, `12.50` ou `R$ 12,50`. Item sem preço ou com preço negativo é
 recusado na hora.
+
+### Opções de item
+
+Cada item tem um botão **⚙** que abre o editor de **opções** — os grupos que o cliente
+escolhe antes de adicionar (tamanho, ponto, adicionais, sabores…):
+
+- **Grupo** tem nome (`Tamanho`), tipo e obrigatoriedade
+- **Tipo único** (radio) — o cliente escolhe uma opção; **múltiplo** (caixa) — quantas
+  quiser
+- **Obrigatório** — sem escolher, o botão de adicionar fica bloqueado
+- Cada opção tem nome e **acréscimo de preço** (o valor é somado ao preço base, então
+  a opção `Normal` costuma ser `0`)
+
+Um item com opções mostra **Escolher** em vez do contador rápido no cartão: o cliente
+escolhe no modal e escolhas diferentes viram linhas separadas no carrinho (um X-Burguer
+com bacon e outro sem convivem no mesmo pedido). As opções vão para a planilha na aba
+**Opcoes** e voltam anexadas ao item na leitura. O painel verifica o item pelo nome,
+ignorando acento e maiúsculas.
 
 ## Salvar e levar o cardápio para outro lugar
 
@@ -137,6 +162,7 @@ No navegador de quem está usando, em `localStorage`:
 | `cardapio:admin:sessao` | marca de "logado neste navegador" |
 | `cardapio:publicado:v1` | digital do cardápio que estava no ar, para avisar o que falta publicar |
 | `cardapio:planilha:ultimo` | data do último envio para a planilha |
+| `cardapio:pedido:atual` | último pedido enviado, para a faixa 🛵 reaparecer ao voltar |
 
 Isso significa que:
 
@@ -193,7 +219,27 @@ enviar — a mensagem é enviada pelo WhatsApp dele, então o pedido chega como 
 normal e você responde por lá. Não há API nem custo envolvido.
 
 Cada item do carrinho aceita uma observação própria ("sem cebola", "bem passado"),
-que entra na mensagem junto da linha do item.
+que entra na mensagem junto da linha do item. Quando o item tem opções, elas aparecem
+na mensagem embaixo da linha (`• Tamanho: Duplo (+R$ 8,00)`).
+
+## Acompanhar o pedido
+
+Depois de enviar, o cliente vê uma faixa **🛵 Acompanhar pedido #0310-117** no alto do
+cardápio. O link abre a página `acompanhar.html`, que consulta o status na planilha a
+cada 15 segundos e desenha a linha do tempo:
+
+```
+Recebido  →  Em preparo  →  A caminho / Pronto para retirada  →  Concluído
+```
+
+O dono muda o status editando a coluna **Status** da aba `Pedidos` (padrão `Novo`;
+também entende `Em preparo`, `Saiu para entrega`, `Pronto para retirada`, `Concluído`
+e `Cancelado`). A página também aceita digitar o número à mão, então quem perdeu o
+link consegue acompanhar mesmo assim. Se o cliente fechar a faixa, o número sai do
+navegador dele.
+
+A consulta é uma leitura pública e leve (`?pedido=0310-117`): devolve só o status, sem
+arrastar o cardápio inteiro, porque a página pergunta de novo de tempo em tempo.
 
 ## Acessibilidade e instalação
 
@@ -428,9 +474,51 @@ Outras coisas para saber:
 - Ao publicar o site de novo, **suba a pasta `img/` junto**. Se ela não for, os
   itens voltam a mostrar o emoji.
 
-> **Peso das fotos:** a pasta `img/` passa de 4 MB, e só a `isca-de-peixe.jpg` tem
-> 1,5 MB. No 4G isso é a diferença entre o cardápio abrir na hora e ficar girando.
-> Baixe as fotos para uns 200–400 KB cada antes de publicar.
+> **Peso das fotos:** as 13 fotos já vêm redimensionadas, com 855 KB no total. A
+> `isca-de-peixe.jpg` saiu de 1,5 MB para 72 KB sem diferença visível, porque o
+> cartão tem no máximo ~420 px de largura e a foto é servida em 840 px (2x de
+> densidade). Ao trocar ou adicionar uma foto, mantenha esse mesmo teto: **lado
+> maior de 840 px e qualidade JPEG 82**. Foto de celular de 4000 px só aumenta o
+> peso — o navegador vai descartar quase tudo assim mesmo.
+
+#### Trocar ou adicionar uma foto
+
+Tem um script no projeto que faz isso, e ele já cuida do nome do arquivo.
+
+Primeiro, jogue as fotos novas na pasta **`novas_img/`** (ela já existe, ao lado de
+`tools/`). Depois abra o PowerShell na pasta do projeto e rode:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\redimensionar-fotos.ps1
+```
+
+Ele reduz para 840 px, regrava em JPEG 82, **tira acento e troca espaço por hífen**
+no nome, grava em `img/` e imprime no fim as linhas prontas para colar na coluna
+*Link da imagem* da planilha. A pasta `novas_img/` não é alterada.
+
+Exemplo do que ele imprime:
+
+```
+img/cafe-gelado-premium.jpg
+img/batata-cheddar-bacon.jpg
+```
+
+Se as fotos estiverem em outro lugar, aponte a pasta: `-Origem "C:\fotos"`.
+
+Se preferir fazer na mão: no Windows, selecione as fotos no Explorer, clique com o
+botão direito → **Redimensionar imagens** → *Lado maior* 840 px. Depois renomeie
+seguindo o padrão (minúsculas, sem acento, hífen no lugar do espaço) e cole
+`img/nome-do-arquivo.jpg` na planilha.
+
+> O script **não** sobrescreve uma foto por outra pior: se o arquivo que já está em
+> `img/` for menor, ele mantém o que está lá. Para forçar a troca assim mesmo, use
+> `-Forcar`.
+>
+> Aceita `.jpg`, `.png`, `.webp`, `.bmp`, `.gif` e `.tiff`. O WebP é decodificado
+> pelo próprio Windows (o mesmo motor do visualizador de fotos), então foto baixada
+> nesse formato funciona sem conversão. Formato que o Windows não abre de jeito
+> nenhum (`.heic` de iPhone, por exemplo) aparece como aviso na tela em vez de
+> sumir calado.
 
 ### Quando a imagem não aparece
 
@@ -476,6 +564,9 @@ mostrar a imagem aí, o problema é o endereço, não o cardápio.
 | `Itens` | uma linha por item pedido | acrescenta no fim |
 | `Cardápio` | uma linha por item do cardápio | substitui tudo |
 | `Config` | uma linha por configuração da loja | substitui tudo |
+| `Bairros` | uma linha por bairro (taxa e tempo) | substitui tudo |
+| `Opcoes` | uma linha por opção de item | substitui tudo |
+| `Relatorio` | relatório de vendas (calculado) | o script regrava a cada pedido |
 | `Registro` | histórico de cada chamada | acrescenta no fim |
 
 #### Aba `Cardápio`
@@ -510,10 +601,15 @@ Duas colunas, `Chave` e `Valor`, com uma linha por configuração:
 
 `nome`, `descricao`, `whatsapp`, `mensagemAbertura`, `corPrimaria`,
 `simboloMoeda`, `taxaEntrega`, `pedidoMinimo`, `aberto`, `mensagemFechado`,
-`pedirNome`, `pedirEntrega`.
+`pedirNome`, `pedirEntrega`, `formasPagamento`, `tempoEntrega`, `tempoRetirada`,
+`enderecoLoja`, `instagram`.
 
 No fim há uma linha `publicado_em`, que é só um comentário de quando foi a última
 publicação. `taxaEntrega` e `pedidoMinimo` saem formatados em R$.
+
+Os bairros ficam numa aba separada (**Bairros**, colunas `Bairro`, `Taxa`, `Tempo`,
+`Ativo`), uma linha por bairro. Lista vazia é normal e significa "uso a taxa única do
+`Config`"; quando há bairros, a taxa do bairro escolhido vence.
 
 `planilhaUrl` e `planilhaToken` **não** vão para a planilha: a URL diz onde ler, e
 pedir isso à planilha seria circular. Elas ficam só no navegador.
@@ -525,8 +621,32 @@ na coluna **Itens do pedido** e também na aba `Itens`, uma linha por produto �
 aba que permite saber quanto saiu de cada item:
 
 ```
-=SOMASE(Itens!E:E;"X-Burguer";Itens!G:G)
+=SOMASE(Itens!E:E;"X-Burguer";Itens!H:H)
 ```
+
+A última coluna, **Status**, é a que o cliente acompanha (veja
+[Acompanhar o pedido](#acompanhar-o-pedido)). Ela nasce com `Novo` e o dono troca à mão.
+
+#### Aba `Bairros`
+
+Uma linha por bairro, com as colunas `Bairro`, `Taxa`, `Tempo` e `Ativo`. É o que
+alimenta o seletor de bairro no checkout: escolhido o bairro, a taxa dele vence a taxa
+única. Deixar a aba só com o cabeçalho significa "nenhum bairro" — aí vale a
+`taxaEntrega` do `Config`.
+
+#### Aba `Opcoes`
+
+Uma linha por opção de item, com as colunas `Item`, `Grupo`, `Tipo`, `Opcao`, `Preco`
+e `Obrigatorio`. `Tipo` é `unico` (radio) ou `multiplo` (caixa); `Preco` é o acréscimo
+somado ao preço base; `Obrigatorio` é `Sim` ou `Nao`. O item é casado pelo nome,
+ignorando acento e maiúsculas.
+
+#### Aba `Relatorio`
+
+O script regrava esta aba a cada pedido novo: um resumo com número de pedidos,
+faturamento e ticket médio, mais as quebras "por item" e "por dia". Os totais usam
+fórmulas (`SOMASE`/`CONT.SE`), então continuam certos mesmo se você editar os pedidos
+depois. Não é preciso mexer nela — é só leitura.
 
 ### Token (recomendado) — protege a escrita, não a leitura
 
@@ -591,10 +711,20 @@ servidor local sem mexer no arquivo que vai junto com o site.
 ```
 cardapio/
 ├── index.html            cardápio do cliente
+├── acompanhar.html       acompanhamento do pedido (link da faixa 🛵)
 ├── admin.html            painel do dono
 ├── cardapio.json         exemplo embutido / backup — a página não o busca mais
 ├── planilha.gs           script do Google Sheets (cole no Google, não no site)
+├── .gitignore            mantém tools/, novas_img/ e cópias fora da publicação
+├── tools/
+│   └── redimensionar-fotos.ps1   reduz fotos novas p/ 840 px e renomeia
+├── novas_img/            jogue aqui as fotos novas antes de rodar o script
 ├── img/                  fotos dos itens (opcional — suba junto ao publicar)
+│
+│   ⚠️ Não deixe cópia das fotos em nenhuma pasta dentro de cardapio/.
+│   Uma pasta como "img - Copia" na raiz vai junto na publicação: sobe
+│   3,7 MB de arquivo morto para o GitHub Pages. Guarde o original em
+│   pasta FORA de cardapio/ (ex.: ../fotos-originais/).
 └── assets/
     ├── css/style.css     todo o estilo, com variáveis de cor
     └── js/
@@ -602,6 +732,7 @@ cardapio/
         ├── store.js      dados, validação, salvar/carregar, senha
         ├── planilha.js   envio de pedidos e cardápio para o Google Sheets
         ├── app.js        cardápio, busca, carrinho, mensagem do WhatsApp
+        ├── acompanhar.js status do pedido, consulta de 15 em 15 segundos
         └── admin.js      painel: itens, categorias, config, planilha, JSON
 ```
 
@@ -621,11 +752,13 @@ esperando o Google.
 
 1. Troque o WhatsApp do exemplo pelo número real
 2. Troque a senha do painel
-3. Publique o `planilha.gs` no Google e **crie uma implantação nova** (o `doGet` que
-   devolve o cardápio e a aba `Config` são do script novo; a implantação antiga não os
-   tem). O cardápio avisa "script desatualizado" quando encontra a versão velha
+3. Publique o `planilha.gs` no Google e **crie uma implantação nova**. O script novo
+   traz a leitura de `Config`, `Bairros` e `Opcoes`, o relatório e a consulta
+   `?pedido=` do acompanhamento; a implantação antiga não tem nada disso. O cardápio
+   avisa "script desatualizado" quando encontra a versão velha
 4. Cole a URL em **Configurações** do painel e clique uma vez em **Enviar cardápio
-   agora** — é isso que cria as abas `Cardápio` e `Config`
+   agora** — é isso que cria as abas `Cardápio`, `Config`, `Bairros` e `Opcoes`
+   (`Pedidos`, `Itens` e `Registro` nascem no primeiro pedido; `Relatorio` nasce junto)
 5. Cole a **mesma URL** em `assets/js/planilha-site.js` e **publique o site de novo**.
    Sem isso o cliente continua vendo o exemplo embutido
 6. Se usar fotos locais, suba a pasta `img/` junto com o site
@@ -634,7 +767,9 @@ esperando o Google.
 8. Coloque o token: `var TOKEN` no script, o mesmo valor em **Token do script** do
    painel, e uma implantação nova. A leitura do cardápio continua de graça — o token
    protege a escrita
-9. Abra o link no celular e faça um pedido de teste de ponta a ponta
+9. Abra o link no celular e faça um pedido de teste de ponta a ponta. Depois troque o
+   **Status** do pedido na aba `Pedidos` e confira que a página `acompanhar.html` muda
+   sozinha (a faixa 🛵 aparece logo depois do envio)
 10. **Teste em janela anônima.** O navegador de quem configurou guarda a URL antiga e
     mascara problema de implantação — foi assim que um token novo passou por
     funcionando para o dono e quebrava para todo mundo

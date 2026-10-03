@@ -61,8 +61,30 @@ var ABA_CONFIG = 'Config';
 var CAMPOS_CONFIG = [
   'nome', 'descricao', 'whatsapp', 'mensagemAbertura', 'corPrimaria',
   'simboloMoeda', 'taxaEntrega', 'pedidoMinimo', 'aberto',
-  'mensagemFechado', 'pedirNome', 'pedirEntrega'
+  'mensagemFechado', 'pedirNome', 'pedirEntrega',
+  'formasPagamento', 'tempoEntrega', 'tempoRetirada', 'enderecoLoja', 'instagram'
 ];
+
+/* Aba de taxas por bairro: uma linha por bairro (Bairro, Taxa, Tempo,
+   Ativo). Quando existe, o cliente escolhe o bairro no checkout e a
+   taxa dele vence a taxa unica da aba Config. */
+var ABA_BAIRROS = 'Bairros';
+
+/* Aba de opcoes de item: uma linha por opcao (Item, Grupo, Tipo,
+   Opcao, Preco, Obrigatorio). As opcoes de um grupo sao juntadas pelo
+   nome do item e anexadas a ele na leitura, para o cliente escolher o
+   tamanho, os adicionais ou os sabores no carrinho. */
+var ABA_OPCOES = 'Opcoes';
+
+/* Abas de pedido. A aba Itens e o formato longo (uma linha por item
+   pedido), que e o que permite somar por item. */
+var ABA_PEDIDOS = 'Pedidos';
+var ABA_ITENS = 'Itens';
+
+/* Aba de relatorio de vendas. E GERADA pelo script a cada pedido:
+   o conteudo e sempre recalculado, entao nao ha o risco de ficar
+   defasado em relacao as abas Pedidos/Itens. */
+var ABA_RELATORIO = 'Relatorio';
 
 /* ------------------------------------------------------------------
    Recebe o POST do navegador
@@ -96,6 +118,17 @@ function doPost(e) {
   } catch (erro) {
     registrar('erro', dados.acao + ': ' + erro.message);
     return responder({ ok: false, erro: erro.message });
+  }
+
+  /* O relatorio e derivado das abas gravadas agora. Se ele falhar,
+     o pedido ja esta salvo: nao vale devolver erro para o cliente
+     por causa de uma aba de leitura. */
+  if (dados.acao === 'pedido') {
+    try {
+      gerarRelatorio();
+    } catch (erro) {
+      registrar('erro', 'relatorio: ' + erro.message);
+    }
   }
 
   return responder({ ok: true, abas: resumo });
@@ -149,12 +182,22 @@ function doGet(e) {
     });
   }
 
+  /* Consulta de status: resposta leve, só o pedido. A página
+     Acompanhar fica perguntando de tempo em tempo, e arrastar o
+     cardápio e as configurações inteiras a cada pergunta seria
+     desperdício. */
+  if (parametro.pedido) {
+    return responderLeia(lerStatusPedido(parametro.pedido));
+  }
+
   var menu;
   var config = null;
+  var bairros = null;
 
   try {
     menu = lerCardapio();
     config = lerConfig();
+    bairros = lerBairros();
   } catch (erro) {
     registrar('erro', 'leitura do cardapio: ' + erro.message);
     return responderLeia({ ok: false, erro: erro.message });
@@ -162,8 +205,9 @@ function doGet(e) {
 
   /* menu vazio e config null sao respostas legitimas: significam
      "a planilha existe mas ainda nao foi publicada". O navegador
-     entende isso e mantem o que ja tinha. */
-  return responderLeia({ ok: true, menu: menu, config: config });
+     entende isso e mantem o que ja tinha. Bairros null (aba
+     inexistente) tambem nao apaga nada; lista vazia apaga. */
+  return responderLeia({ ok: true, menu: menu, config: config, bairros: bairros });
 }
 
 /* ------------------------------------------------------------------
@@ -188,7 +232,14 @@ function textoDa(linha, coluna) {
 function chaveDe(t) {
   if (t === null || t === undefined) return '';
 
-  return String(t)
+  /* O normalize('NFD') separa a letra do acento (é -> e + mark), e so
+     entao a faixa de combining marks pode limpar. Sem ele, "Opção"
+     pre-composto (o codigo unico é) nao casaria com "Opcao". Fica sob
+     guarda porque nem toda engine antiga tem normalize. */
+  var s = String(t);
+  if (typeof s.normalize === 'function') s = s.normalize('NFD');
+
+  return s
     .replace(/[̀-ͯ]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
@@ -332,7 +383,8 @@ function lerCardapio() {
     });
   }
 
-  return menu;
+  /* As opções vivem numa aba à parte, casadas pelo nome do item. */
+  return anexarOpcoes(menu);
 }
 
 /**
@@ -361,6 +413,379 @@ function lerConfig() {
 }
 
 /**
+ * Lê a aba Bairros (uma linha por bairro) e devolve a lista na ordem
+ * da planilha. Devolve null quando a aba não existe — assim uma
+ * planilha antiga, sem a aba, não apaga os bairros que o navegador
+ * já tinha. Uma aba só com o cabeçalho devolve [], que é a resposta
+ * legítima de "nenhum bairro cadastrado".
+ */
+function lerBairros() {
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = planilha.getSheetByName(ABA_BAIRROS);
+
+  if (!aba) return null;
+  if (aba.getLastRow() < 2) return [];
+
+  var cabecalho = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+  var col = function (nome) { return cabecalho.indexOf(nome) + 1; };
+
+  var colBairro = col('Bairro') || col('Nome');
+  if (!colBairro) return [];
+
+  var colTaxa = col('Taxa');
+  var colTempo = col('Tempo');
+  var colAtivo = col('Ativo');
+
+  var valores = aba.getRange(2, 1, aba.getLastRow() - 1, cabecalho.length).getValues();
+  var bairros = [];
+
+  for (var i = 0; i < valores.length; i++) {
+    var linha = valores[i];
+    var nome = textoDa(linha, colBairro);
+    if (!nome) continue;
+
+    bairros.push({
+      nome: nome,
+      taxa: precoDe(colTaxa ? linha[colTaxa - 1] : 0),
+      tempo: textoDa(linha, colTempo),
+      ativo: booleanoDe(colAtivo ? linha[colAtivo - 1] : '', true)
+    });
+  }
+
+  return bairros;
+}
+
+/**
+ * Dá o status de um pedido pelo número dele (coluna "Pedido" da aba
+ * Pedidos). É o que alimenta a página Acompanhar: o cliente manda o
+ * número e fica perguntando de tempo em tempo.
+ *
+ * Devolve sempre ok:true (a pergunta foi respondida), com
+ * encontrado:false quando o número não está lá — o cliente mostrou um
+ * número digitado errado, e um erro no console não ajudaria em nada.
+ * Um status vazio conta como "Novo": o dono que ainda não mexeu na
+ * célula tem o pedido recém-chegado.
+ */
+function lerStatusPedido(id) {
+  var alvo = String(id === null || id === undefined ? '' : id).trim();
+  if (!alvo) return { ok: false, erro: 'Informe o número do pedido.' };
+
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = planilha.getSheetByName(ABA_PEDIDOS);
+  if (!aba || aba.getLastRow() < 2) {
+    return { ok: true, pedido: alvo, status: '', encontrado: false };
+  }
+
+  var cabecalho = aba.getRange(1, 1, 1, Math.max(1, aba.getLastColumn())).getValues()[0];
+  var colPedido = acharColuna(cabecalho, ['Pedido']);
+  if (!colPedido) return { ok: true, pedido: alvo, status: '', encontrado: false };
+
+  var colStatus = acharColuna(cabecalho, ['Status']);
+  var colTipo = acharColuna(cabecalho, ['Tipo']);
+
+  var valores = aba.getRange(2, 1, aba.getLastRow() - 1, cabecalho.length).getValues();
+
+  /* De trás para a frente: se o mesmo número aparecer duas vezes
+     (reimpressão), vale o mais recente. */
+  for (var i = valores.length - 1; i >= 0; i--) {
+    if (String(valores[i][colPedido - 1]).trim() !== alvo) continue;
+
+    var status = colStatus ? String(valores[i][colStatus - 1] || '').trim() : '';
+    var tipo = colTipo ? String(valores[i][colTipo - 1] || '').trim().toLowerCase() : '';
+
+    return {
+      ok: true,
+      pedido: alvo,
+      status: status || 'Novo',
+      tipo: tipo,
+      encontrado: true
+    };
+  }
+
+  return { ok: true, pedido: alvo, status: '', encontrado: false };
+}
+
+/* Acha o número da coluna pelo nome, ignorando acento e caixa. Assim
+   tanto faz o dono escrever "Opcao" (como o painel grava) ou "Opção",
+   "Preco" ou "Preço". Devolve 0 quando não existe. */
+function acharColuna(cabecalho, nomes) {
+  for (var i = 0; i < cabecalho.length; i++) {
+    var h = chaveDe(cabecalho[i]);
+    for (var j = 0; j < nomes.length; j++) {
+      if (h === chaveDe(nomes[j])) return i + 1;
+    }
+  }
+  return 0;
+}
+
+/**
+ * Lê a aba Opcoes (uma linha por opção) e devolve um mapa por nome de
+ * item: { "x-burguer": [ { grupo, tipo, obrigatorio, itens: [...] } ] }.
+ * Devolve um mapa vazio quando a aba não existe, para uma planilha
+ * antiga continuar funcionando sem opções.
+ *
+ * Um grupo é único (radio) quando o campo Tipo não é "multiplo" —
+ * assim o caso mais comum (Tamanho, Ponto) já sai certo sem o dono
+ * precisar preencher nada.
+ */
+function lerOpcoes() {
+  var mapa = {};
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var aba = planilha.getSheetByName(ABA_OPCOES);
+
+  if (!aba || aba.getLastRow() < 2) return mapa;
+
+  var cabecalho = aba.getRange(1, 1, 1, aba.getLastColumn()).getValues()[0];
+
+  var colItem = acharColuna(cabecalho, ['Item']);
+  var colGrupo = acharColuna(cabecalho, ['Grupo']);
+  var colOpcao = acharColuna(cabecalho, ['Opcao']);
+  if (!colItem || !colGrupo || !colOpcao) return mapa;
+
+  var colTipo = acharColuna(cabecalho, ['Tipo']);
+  var colPreco = acharColuna(cabecalho, ['Preco']);
+  var colObrig = acharColuna(cabecalho, ['Obrigatorio']);
+
+  var valores = aba.getRange(2, 1, aba.getLastRow() - 1, cabecalho.length).getValues();
+
+  for (var i = 0; i < valores.length; i++) {
+    var linha = valores[i];
+    var nomeItem = textoDa(linha, colItem);
+    var nomeGrupo = textoDa(linha, colGrupo);
+    var nomeOpcao = textoDa(linha, colOpcao);
+    if (!nomeItem || !nomeGrupo || !nomeOpcao) continue;
+
+    var itemChave = chaveDe(nomeItem);
+    var grupos = mapa[itemChave] || (mapa[itemChave] = []);
+    var grupoChave = chaveDe(nomeGrupo);
+    var grupo = null;
+
+    for (var g = 0; g < grupos.length; g++) {
+      if (chaveDe(grupos[g].grupo) === grupoChave) { grupo = grupos[g]; break; }
+    }
+
+    if (!grupo) {
+      grupo = {
+        grupo: nomeGrupo,
+        tipo: chaveDe(colTipo ? linha[colTipo - 1] : '') === 'multiplo' ? 'multiplo' : 'unico',
+        obrigatorio: booleanoDe(colObrig ? linha[colObrig - 1] : '', false),
+        itens: []
+      };
+      grupos.push(grupo);
+    }
+
+    grupo.itens.push({
+      nome: nomeOpcao,
+      preco: precoDe(colPreco ? linha[colPreco - 1] : 0)
+    });
+  }
+
+  return mapa;
+}
+
+/**
+ * Anexa as opções de cada grupo ao item de mesmo nome no cardápio.
+ * O casamento é por nome (sem acento e sem caixa), porque é o que a
+ * planilha guarda na coluna Item da aba Opcoes.
+ */
+function anexarOpcoes(menu) {
+  if (!menu || !menu.length) return menu;
+
+  var mapa = lerOpcoes();
+  if (!Object.keys(mapa).length) return menu;
+
+  for (var i = 0; i < menu.length; i++) {
+    var itens = menu[i].itens || [];
+
+    for (var j = 0; j < itens.length; j++) {
+      var grupos = mapa[chaveDe(itens[j].nome)];
+      if (grupos && grupos.length) itens[j].opcoes = grupos;
+    }
+  }
+
+  return menu;
+}
+
+/* ------------------------------------------------------------------
+   Relatorio de vendas
+   ------------------------------------------------------------------ */
+
+/* 1 -> A, 26 -> Z, 27 -> AA. Usado para montar o endereco das
+   formulas a partir do nome da coluna, sem chumbar letras. */
+function letraColuna(n) {
+  var s = '';
+  while (n > 0) {
+    var resto = (n - 1) % 26;
+    s = String.fromCharCode(65 + resto) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+/* Acha a letra da coluna pelo nome do cabecalho. Devolve '' quando a
+   aba nao existe ou a coluna nao esta la. */
+function letraDaColuna(aba, nome) {
+  if (!aba || aba.getLastRow() < 1) return '';
+
+  var cabecalho = aba.getRange(1, 1, 1, Math.max(1, aba.getLastColumn())).getValues()[0];
+
+  for (var i = 0; i < cabecalho.length; i++) {
+    if (chaveDe(cabecalho[i]) === chaveDe(nome)) return letraColuna(i + 1);
+  }
+  return '';
+}
+
+/* Valores nao-vazios de uma coluna, sem repetir e na ordem em que
+   aparecem. E o que da a lista de itens e a de dias do relatorio. */
+function valoresUnicos(aba, numeroColuna) {
+  var vistos = {};
+  var lista = [];
+  if (!aba || !numeroColuna || aba.getLastRow() < 2) return lista;
+
+  var valores = aba.getRange(2, numeroColuna, aba.getLastRow() - 1, 1).getValues();
+
+  for (var i = 0; i < valores.length; i++) {
+    var v = valores[i][0];
+    if (v === '' || v === null || v === undefined) continue;
+    var chave = chaveDe(v);
+    if (vistos[chave]) continue;
+    vistos[chave] = true;
+    lista.push(v);
+  }
+
+  return lista;
+}
+
+/* Numero da coluna a partir da letra (A -> 1). */
+function numeroColuna(letra) {
+  var n = 0;
+  for (var i = 0; i < letra.length; i++) {
+    n = n * 26 + (letra.charCodeAt(i) - 64);
+  }
+  return n;
+}
+
+/**
+ * Monta a aba Relatorio a partir das abas Pedidos e Itens.
+ *
+ * Usa formulas (SOMASE/CONT.SE) em vez de numeros calculados: assim o
+ * dono pode editar um pedido na mao e o relatorio acompanha. A LISTA
+ * de itens e de dias, essa, e reescrita a cada pedido — e o que faz
+ * um item ou um dia novo aparecer sem o dono mexer em nada.
+ *
+ * Se uma das abas nao existir (nunca houve pedido), o relatorio sai
+ * so com os titulos e as formulas nao quebram: SUMIF de intervalo
+ * vazio devolve 0, e IFERROR cobre a divisao por zero.
+ */
+function gerarRelatorio() {
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+  var itens = planilha.getSheetByName(ABA_ITENS);
+  var pedidos = planilha.getSheetByName(ABA_PEDIDOS);
+
+  var aba = planilha.getSheetByName(ABA_RELATORIO);
+  if (aba) aba.clear();
+  else aba = planilha.insertSheet(ABA_RELATORIO);
+
+  /* Referencias (coluna inteira, para pegar linhas futuras). */
+  var refItem = itens ? letraDaColuna(itens, 'Item') : '';
+  var refQtd = itens ? letraDaColuna(itens, 'Quantidade') : '';
+  var refValorItem = itens ? letraDaColuna(itens, 'Total do item') : '';
+  var refDataPed = pedidos ? letraDaColuna(pedidos, 'Data') : '';
+  var refTotalPed = pedidos ? letraDaColuna(pedidos, 'TOTAL') : '';
+  var refNumPed = pedidos ? letraDaColuna(pedidos, 'Pedido') : '';
+
+  var refItensItem = refItem ? 'Itens!$' + refItem + ':$' + refItem : '';
+  var refItensQtd = refQtd ? 'Itens!$' + refQtd + ':$' + refQtd : '';
+  var refItensValor = refValorItem ? 'Itens!$' + refValorItem + ':$' + refValorItem : '';
+  var refPedData = refDataPed ? 'Pedidos!$' + refDataPed + ':$' + refDataPed : '';
+  var refPedTotal = refTotalPed ? 'Pedidos!$' + refTotalPed + ':$' + refTotalPed : '';
+
+  var linha = 1;
+
+  aba.getRange(linha, 1).setValue('Relatório de vendas');
+  aba.getRange(linha, 1).setFontWeight('bold');
+  linha += 1;
+
+  aba.getRange(linha, 1).setValue('Atualizado em');
+  aba.getRange(linha, 2).setValue(new Date());
+  linha += 2;
+
+  /* --- Resumo geral --- */
+  aba.getRange(linha, 1).setValue('Resumo');
+  aba.getRange(linha, 1).setFontWeight('bold');
+  linha += 1;
+
+  var linhaPedidos = linha;
+  aba.getRange(linha, 1).setValue('Pedidos');
+  if (refNumPed) {
+    aba.getRange(linha, 2).setFormula('=COUNTA(Pedidos!$' + refNumPed + '$2:$' + refNumPed + ')');
+  }
+  linha += 1;
+
+  var linhaFaturamento = linha;
+  aba.getRange(linha, 1).setValue('Faturamento');
+  if (refTotalPed) {
+    aba.getRange(linha, 2).setFormula('=SUM(Pedidos!$' + refTotalPed + '$2:$' + refTotalPed + ')');
+  }
+  linha += 1;
+
+  aba.getRange(linha, 1).setValue('Ticket medio');
+  aba.getRange(linha, 2).setFormula('=IFERROR(B' + linhaFaturamento + '/B' + linhaPedidos + ',0)');
+  linha += 2;
+
+  /* --- Por item --- */
+  aba.getRange(linha, 1).setValue('Por item');
+  aba.getRange(linha, 1).setFontWeight('bold');
+  linha += 1;
+  aba.getRange(linha, 1, 1, 3).setValues([['Item', 'Quantidade', 'Total']]);
+  aba.getRange(linha, 1, 1, 3).setFontWeight('bold');
+  linha += 1;
+
+  var nomes = valoresUnicos(itens, numeroColuna(refItem));
+  for (var i = 0; i < nomes.length; i++) {
+    aba.getRange(linha, 1).setValue(nomes[i]);
+    if (refItem && refQtd) {
+      aba.getRange(linha, 2).setFormula('=SUMIF(' + refItensItem + ',$A' + linha + ',' + refItensQtd + ')');
+    }
+    if (refItem && refValorItem) {
+      aba.getRange(linha, 3).setFormula('=SUMIF(' + refItensItem + ',$A' + linha + ',' + refItensValor + ')');
+    }
+    linha += 1;
+  }
+
+  linha += 1;
+
+  /* --- Por dia --- */
+  aba.getRange(linha, 1).setValue('Por dia');
+  aba.getRange(linha, 1).setFontWeight('bold');
+  linha += 1;
+  aba.getRange(linha, 1, 1, 4).setValues([['Data', 'Pedidos', 'Total', 'Ticket medio']]);
+  aba.getRange(linha, 1, 1, 4).setFontWeight('bold');
+  linha += 1;
+
+  var dias = valoresUnicos(pedidos, numeroColuna(refDataPed));
+  for (var d = 0; d < dias.length; d++) {
+    aba.getRange(linha, 1).setValue(dias[d]);
+    if (refDataPed) {
+      aba.getRange(linha, 2).setFormula('=COUNTIF(' + refPedData + ',$A' + linha + ')');
+    }
+    if (refDataPed && refTotalPed) {
+      aba.getRange(linha, 3).setFormula('=SUMIF(' + refPedData + ',$A' + linha + ',' + refPedTotal + ')');
+    }
+    aba.getRange(linha, 4).setFormula('=IFERROR(C' + linha + '/B' + linha + ',0)');
+    linha += 1;
+  }
+
+  /* Uma coluna larga para o "Ticket medio" nao nascer cortado. */
+  aba.setColumnWidth(1, 220);
+  aba.setColumnWidth(3, 120);
+  aba.setColumnWidth(4, 120);
+
+  registrar('relatorio', nomes.length + ' item(ns), ' + dias.length + ' dia(s)');
+  return { itens: nomes.length, dias: dias.length };
+}
+
+/**
  * Empacota o JSON numa chamada de função. É o truque do JSONP, e
  * só entra em uso por navegador muito antigo: o texto devolvido
  * precisa ser JavaScript válido, não JSON puro.
@@ -378,7 +803,12 @@ function escreverAba(spec, acao, origem) {
   var cabecalho = spec.cabecalho || [];
   var linhas = spec.linhas || [];
 
-  if (!linhas.length) return { aba: spec.nome, linhas: 0, pulada: true };
+  /* No modo replace, zero linhas é válido e significa "limpar a
+     aba" (ex.: o dono apagou todos os bairros). No append, sem
+     linhas não há o que fazer. */
+  if (!linhas.length && spec.modo !== 'replace') {
+    return { aba: spec.nome, linhas: 0, pulada: true };
+  }
 
   var aba = abaOuCriar(spec.nome);
 
@@ -394,8 +824,9 @@ function escreverAba(spec, acao, origem) {
        não repetir a linha de título a cada pedido. */
     if (aba.getLastRow() === 0) {
       aba.getRange(1, 1, 1, cabecalho.length).setValues([cabecalho]);
-      cabecalhoNegrito(aba, cabecalho.length);
       aba.setFrozenRows(1);
+    } else {
+      sincronizarCabecalho(aba, cabecalho);
     }
     aba.getRange(aba.getLastRow() + 1, 1, linhas.length, linhas[0].length)
        .setValues(linhas);
@@ -409,6 +840,20 @@ function escreverAba(spec, acao, origem) {
   registrar(acao, spec.nome + ' · ' + linhas.length + ' linha(s) · ' + origem);
 
   return { aba: spec.nome, linhas: linhas.length };
+}
+
+/* Estende o cabeçalho de uma aba que já existia quando o código
+   ganha uma coluna nova (ex.: "Bairro" na aba Pedidos). Sem isso, a
+   coluna extra ficaria sem título e o dono não saberia o que é. Só
+   escreve as colunas que faltam, para não mexer no que já está lá. */
+function sincronizarCabecalho(aba, cabecalho) {
+  var atual = aba.getRange(1, 1, 1, Math.max(1, aba.getLastColumn())).getValues()[0];
+  var jaTem = 0;
+  while (jaTem < atual.length && String(atual[jaTem] || '').trim()) jaTem++;
+
+  for (var i = jaTem; i < cabecalho.length; i++) {
+    aba.getRange(1, i + 1).setValues([[cabecalho[i]]]);
+  }
 }
 
 function cabecalhoNegrito(aba, colunas) {

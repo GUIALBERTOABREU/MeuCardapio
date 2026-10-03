@@ -57,6 +57,7 @@
       <div class="abas-admin" role="tablist">
         <button class="aba-admin" role="tab" data-tab="itens" aria-selected="true" aria-controls="tabItens">Itens e categorias</button>
         <button class="aba-admin" role="tab" data-tab="config" aria-selected="false" aria-controls="tabConfig" tabindex="-1">Configurações</button>
+        <button class="aba-admin" role="tab" data-tab="bairros" aria-selected="false" aria-controls="tabBairros" tabindex="-1">Bairros</button>
         <button class="aba-admin" role="tab" data-tab="json" aria-selected="false" aria-controls="tabJson" tabindex="-1">Arquivo JSON</button>
       </div>
 
@@ -104,6 +105,15 @@
               <label for="cfgCor">Cor principal</label>
               <input type="color" id="cfgCor" style="height:44px;padding:4px;cursor:pointer">
             </div>
+            <div class="campo">
+              <label for="cfgEndereco">Endereço da loja</label>
+              <input type="text" id="cfgEndereco" placeholder="Rua das Flores, 123 — Centro">
+              <span class="dica">Aparece no rodapé e na mensagem de retirada.</span>
+            </div>
+            <div class="campo">
+              <label for="cfgInstagram">Instagram</label>
+              <input type="text" id="cfgInstagram" placeholder="@minhalanchonete">
+            </div>
           </div>
         </div>
 
@@ -126,6 +136,19 @@
             <div class="campo">
               <label for="cfgAbertura">Mensagem de abertura</label>
               <input type="text" id="cfgAbertura" placeholder="Olá! Gostaria de fazer um pedido:">
+            </div>
+            <div class="campo">
+              <label for="cfgPagamento">Formas de pagamento</label>
+              <input type="text" id="cfgPagamento" placeholder="Dinheiro, Pix, Cartão">
+              <span class="dica">Separe por vírgula. Vira uma lista no checkout. Vazio = campo de texto livre.</span>
+            </div>
+            <div class="campo">
+              <label for="cfgTempoEntrega">Tempo de entrega</label>
+              <input type="text" id="cfgTempoEntrega" placeholder="40–60 min">
+            </div>
+            <div class="campo">
+              <label for="cfgTempoRetirada">Tempo de retirada</label>
+              <input type="text" id="cfgTempoRetirada" placeholder="20–30 min">
             </div>
           </div>
 
@@ -204,6 +227,22 @@
               <button type="button" class="btn btn-contorno" id="btnTrocarSenha">Alterar senha</button>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ---------- ABA BAIRROS ---------- -->
+      <section id="tabBairros" class="oculto" role="tabpanel" aria-label="Bairros e taxas">
+        <div class="painel">
+          <div class="painel-topo">
+            <h2>Taxas por bairro</h2>
+            <button type="button" class="btn btn-sm btn-primario" id="btnNovoBairro">+ Novo bairro</button>
+          </div>
+          <p class="dica" style="margin:0 0 14px;color:var(--texto-suave);font-size:.88rem">
+            Quando há bairros cadastrados, o cliente escolhe o dele no checkout e a taxa do
+            bairro substitui a <em>Taxa de entrega</em> das Configurações. Sem bairros, vale
+            só a taxa única. Estas linhas viram a aba <code>Bairros</code> ao publicar.
+          </p>
+          <div class="lista-admin" id="listaBairros"></div>
         </div>
       </section>
 

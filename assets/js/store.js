@@ -100,6 +100,18 @@
     return String(valor).trim();
   }
 
+  /* Leitor tolerante de booleano, para campos que o dono digita na
+     planilha ("Sim"/"Nao") ou escreve no JSON (true/false). Vazio usa
+     o padrao. */
+  var NEGADOS = ['nao', 'n', 'f', 'false', '0', 'off'];
+  function verdadeiro(valor, padrao) {
+    if (valor === true) return true;
+    if (valor === false) return false;
+    var s = texto(valor, '').toLowerCase();
+    if (!s) return padrao;
+    return NEGADOS.indexOf(s) < 0;
+  }
+
   function telefoneBruto(valor) {
     // Mantem apenas digitos; codigo do pais sem o "+".
     return String(valor || '').replace(/\D/g, '');
@@ -203,16 +215,43 @@
       mensagemFechado: 'Estamos fechados no momento. Volte em breve!',
       pedirNome: true,
       pedirEntrega: true,
+      /* Campos de loja acrescentados depois. Vazio = o app nao mostra
+         aquele pedaco (ex.: formasPagamento vazio vira campo de texto
+         livre, em vez de lista). */
+      formasPagamento: 'Dinheiro, Pix, Cartao',
+      tempoEntrega: '',
+      tempoRetirada: '',
+      enderecoLoja: '',
+      instagram: '',
       planilhaUrl: '',
       planilhaToken: ''
     },
+    /* Taxas de entrega por bairro. Lista vazia = o app usa a taxa
+       unica de config.taxaEntrega. Quando ha bairros, o cliente
+       escolhe no checkout e a taxa do bairro vence. */
+    bairros: [
+      { nome: 'Centro', taxa: 5, tempo: '30-40 min', ativo: true }
+    ],
     categorias: [
       {
         id: 'lanches',
         nome: 'Lanches',
         icone: '\u{1F354}',
         itens: [
-          { nome: 'X-Burguer', descricao: 'Pão brioche, hambúrguer 150g, queijo cheddar, salada e molho da casa', preco: 18.9, destaque: true },
+          { nome: 'X-Burguer', descricao: 'Pão brioche, hambúrguer 150g, queijo cheddar, salada e molho da casa', preco: 18.9, destaque: true,
+            /* Exemplo de opcoes no SEED: o dono configura pela planilha,
+               mas um cardapio novo ja nasce com um exemplo funcional. */
+            opcoes: [
+              { grupo: 'Tamanho', tipo: 'unico', obrigatorio: true, itens: [
+                { nome: 'Normal', preco: 0 },
+                { nome: 'Duplo', preco: 8 }
+              ] },
+              { grupo: 'Adicionais', tipo: 'multiplo', obrigatorio: false, itens: [
+                { nome: 'Bacon', preco: 4 },
+                { nome: 'Cheddar extra', preco: 3 },
+                { nome: 'Ovo', preco: 2 }
+              ] }
+            ] },
           { nome: 'X-Burguer Duplo', descricao: 'Dois hambúrgueres, queijo, bacon, cebola caramelizada e molho especial', preco: 27.9, destaque: true },
           { nome: 'X-Salada', descricao: 'Hambúrguer, queijo, alface, tomate, pepino, cebola e maionese da casa', preco: 21.9 },
           { nome: 'X-Frango', descricao: 'Filé de frango empanado, queijo, salada e maionese verde', preco: 20.9 },
@@ -244,7 +283,15 @@
         nome: 'Bebidas',
         icone: '\u{1F964}',
         itens: [
-          { nome: 'Refrigerante Lata', descricao: 'Coca-Cola, Guaraná, Fanta ou Sprite. Gelada.', preco: 5.5 },
+          { nome: 'Refrigerante Lata', descricao: 'Coca-Cola, Guaraná, Fanta ou Sprite. Gelada.', preco: 5.5,
+            opcoes: [
+              { grupo: 'Sabor', tipo: 'unico', obrigatorio: true, itens: [
+                { nome: 'Coca-Cola', preco: 0 },
+                { nome: 'Guaraná', preco: 0 },
+                { nome: 'Fanta Laranja', preco: 0 },
+                { nome: 'Sprite', preco: 0 }
+              ] }
+            ] },
           { nome: 'Suco Natural 400ml', descricao: 'Laranja, maracujá, limão ou maracujá com limão', preco: 8 },
           { nome: 'Água Mineral 500ml', descricao: 'Com ou sem gás', preco: 3 },
           { nome: 'Sorvete de Chocolate', descricao: 'Bola de sorvete cremoso com calda de chocolate', preco: 6, disponivel: false }
@@ -258,6 +305,51 @@
      Garante que o objeto sempre tenha a forma esperada,
      mesmo que o JSON veio "bagunçado" de outra fonte.
      --------------------------------------------------------- */
+  /* Opcoes de um item: grupos de escolha.
+     Formato final:
+       { grupo, tipo: 'unico'|'multiplo', obrigatorio, itens: [{nome, preco}] }
+     Aceita o formato que veio da planilha e o do JSON. Grupo sem
+     nome ou sem nenhuma opcao valida e descartado. */
+  function normalizarOpcoes(bruto) {
+    var grupos = [];
+
+    (Array.isArray(bruto) ? bruto : []).forEach(function (g) {
+      if (!g || typeof g !== 'object') return;
+
+      var nomeGrupo = texto(g.grupo !== undefined ? g.grupo : g.nome, '');
+      if (!nomeGrupo) return;
+
+      var tipoBruto = texto(g.tipo, '').toLowerCase();
+      var tipo = (tipoBruto === 'multiplo' || tipoBruto === 'múltiplo' ||
+        tipoBruto === 'multiple' || tipoBruto === 'checkbox' ||
+        tipoBruto === 'varios') ? 'multiplo' : 'unico';
+
+      var opcoes = [];
+      var lista = Array.isArray(g.itens) ? g.itens : (Array.isArray(g.opcoes) ? g.opcoes : []);
+
+      lista.forEach(function (o) {
+        if (!o || typeof o !== 'object') return;
+        var nomeOpcao = texto(o.nome !== undefined ? o.nome : o.opcao, '');
+        if (!nomeOpcao) return;
+        opcoes.push({
+          nome: nomeOpcao,
+          preco: Math.max(0, numero(o.preco, 0))
+        });
+      });
+
+      if (!opcoes.length) return;
+
+      grupos.push({
+        grupo: nomeGrupo,
+        tipo: tipo,
+        obrigatorio: verdadeiro(g.obrigatorio, false),
+        itens: opcoes
+      });
+    });
+
+    return grupos;
+  }
+
   function normalizar(entrada) {
     var avisos = [];
     var erros = [];
@@ -281,6 +373,11 @@
       mensagemFechado: texto(cfgOrigem.mensagemFechado, SEED.config.mensagemFechado),
       pedirNome: cfgOrigem.pedirNome !== false,
       pedirEntrega: cfgOrigem.pedirEntrega !== false,
+      formasPagamento: texto(cfgOrigem.formasPagamento, ''),
+      tempoEntrega: texto(cfgOrigem.tempoEntrega, ''),
+      tempoRetirada: texto(cfgOrigem.tempoRetirada, ''),
+      enderecoLoja: texto(cfgOrigem.enderecoLoja, ''),
+      instagram: texto(cfgOrigem.instagram, ''),
       planilhaUrl: planilhaUrl(cfgOrigem.planilhaUrl),
       planilhaToken: texto(cfgOrigem.planilhaToken, '')
     };
@@ -324,7 +421,7 @@
           preco = 0;
         }
 
-        itens.push({
+        var itemFinal = {
           id: itemId,
           nome: nome,
           descricao: texto(item.descricao, ''),
@@ -333,7 +430,14 @@
           imagem: texto(item.imagem, ''),
           destaque: item.destaque === true,
           disponivel: item.disponivel !== false
-        });
+        };
+
+        /* So guarda a chave quando ha opcoes: mantem o JSON enxuto e
+           evita mexer no formato dos itens sem opcoes. */
+        var opcoes = normalizarOpcoes(item.opcoes);
+        if (opcoes.length) itemFinal.opcoes = opcoes;
+
+        itens.push(itemFinal);
       });
 
       categorias.push({
@@ -341,6 +445,29 @@
         nome: texto(cat.nome, id),
         icone: texto(cat.icone, '\u{1F37D}'),
         itens: itens
+      });
+    });
+
+    /* Bairros de entrega: nome + taxa. Aceita tambem o campo
+       "bairro" no lugar de "nome", para quem montar o JSON a mao. */
+    var bairros = [];
+    var idsBairro = {};
+    (Array.isArray(origem.bairros) ? origem.bairros : []).forEach(function (b) {
+      if (!b || typeof b !== 'object') return;
+
+      var nomeBairro = texto(b.nome !== undefined ? b.nome : b.bairro, '');
+      if (!nomeBairro) return;
+
+      var idB = texto(b.id, '') || slug(nomeBairro);
+      idB = slugUnico(idB, idsBairro);
+      idsBairro[idB] = true;
+
+      bairros.push({
+        id: idB,
+        nome: nomeBairro,
+        taxa: Math.max(0, numero(b.taxa, 0)),
+        tempo: texto(b.tempo, ''),
+        ativo: b.ativo !== false
       });
     });
 
@@ -368,13 +495,13 @@
 
     /* Reexecuta para converter os itens recem-anexados no formato final. */
     if (Array.isArray(origem.itens) && origem.itens.length) {
-      var segunda = normalizar({ config: config, categorias: categorias });
+      var segunda = normalizar({ config: config, categorias: categorias, bairros: bairros });
       avisos = avisos.concat(segunda.avisos);
       erros = erros.concat(segunda.erros);
       return { data: segunda.data, avisos: avisos, erros: erros };
     }
 
-    return { data: { config: config, categorias: categorias }, avisos: avisos, erros: erros };
+    return { data: { config: config, categorias: categorias, bairros: bairros }, avisos: avisos, erros: erros };
   }
 
   function validar(entrada) {

@@ -674,6 +674,66 @@ textarea { resize: vertical; min-height: 76px; }
 .opcao input:checked + span { background: var(--primaria-escura); border-color: var(--primaria-escura); color: #fff; }
 .opcao input:focus-visible + span { outline: 2px solid var(--primaria); outline-offset: 2px; }
 
+/* ---------- opcoes do item (escolha no modal) ---------- */
+.opcoes-item-nome { margin: 0; font-weight: 800; font-size: 1.05rem; }
+
+.grupo-opcoes {
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie-2);
+}
+.grupo-opcoes legend { padding: 0 6px; font-weight: 700; font-size: .85rem; color: var(--texto); }
+.op-obrig, .op-opcional {
+  font-size: .72rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  vertical-align: middle;
+}
+.op-obrig { background: var(--primaria-clara); color: var(--primaria-texto); }
+.op-opcional { color: var(--texto-tenue); }
+
+.opcao-escolha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--borda);
+}
+.opcao-escolha:last-child { border-bottom: 0; }
+.opcao-escolha input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  accent-color: var(--primaria);
+  cursor: pointer;
+}
+.opcao-nome { flex: 1; font-size: .9rem; }
+.opcao-preco { font-size: .82rem; font-weight: 700; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
+
+.campo-qtd { flex-direction: row; align-items: center; justify-content: space-between; }
+.campo-qtd > span:first-child { font-size: .82rem; font-weight: 700; color: var(--texto-suave); }
+
+/* Linha do carrinho: opcoes escolhidas e link para edita-las. */
+.linha-opcoes { margin: 4px 0 0; font-size: .78rem; color: var(--texto-suave); }
+.btn-link {
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  color: var(--primaria-texto);
+  font: inherit;
+  font-size: .8rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.btn-link:hover { opacity: .8; }
+.btn-link:focus-visible { outline: 2px solid var(--primaria); outline-offset: 2px; border-radius: 4px; }
+
 /* ---------- resumo do pedido (preview WhatsApp) ---------- */
 .previa {
   background: var(--superficie-2);
@@ -795,6 +855,39 @@ textarea { resize: vertical; min-height: 76px; }
 .categoria-meta { font-size: .76rem; color: var(--texto-tenue); }
 .categoria-topo .acoes { margin-left: auto; display: flex; gap: 4px; }
 .categoria-corpo { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+
+/* Aba Bairros: uma linha por bairro, com as acoes a direita. */
+.bairro-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+}
+/* Inativo fica marcado pela borda tracejada, e nao por opacidade,
+   para nao derrubar o contraste do texto. */
+.bairro-linha.inativo { border-style: dashed; }
+.bairro-info { display: flex; flex-direction: column; min-width: 0; }
+.bairro-info span { font-size: .82rem; color: var(--texto-suave); }
+.bairro-linha .acoes { margin-left: auto; display: flex; gap: 4px; align-items: center; }
+
+/* Editor de opcoes de item (aba Cardapio, botao de engrenagem). */
+.item-admin-opcoes { color: var(--primaria-texto); }
+.grupo-admin {
+  margin: 0;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  background: var(--superficie-2);
+}
+.grupo-admin legend { padding: 0 6px; font-weight: 700; font-size: .85rem; }
+.opcoes-admin-lista { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; }
+.opcao-admin { display: flex; align-items: center; gap: 8px; }
+.opcao-admin [data-o-nome] { flex: 2; }
+.opcao-admin [data-o-preco] { flex: 1; max-width: 110px; }
+.acoes-grupo { display: flex; gap: 8px; flex-wrap: wrap; }
 
 .item-admin {
   display: flex;
@@ -928,6 +1021,96 @@ textarea { resize: vertical; min-height: 76px; }
   .painel { padding: 14px; }
 }
 
+/* =============================================================
+   Faixa "Acompanhar pedido" (no cardapio) e pagina Acompanhar
+   ============================================================= */
+.faixa-pedido {
+  display: flex; align-items: center; gap: 10px;
+  margin: 12px 0 4px;
+  padding: 10px 14px;
+  background: var(--primaria-clara);
+  border: 1px solid var(--primaria);
+  border-radius: var(--raio-sm);
+}
+.faixa-pedido a {
+  flex: 1; font-weight: 700; color: var(--primaria-texto);
+  text-decoration: none; min-width: 0;
+}
+.faixa-pedido a:hover { text-decoration: underline; }
+.faixa-icone { font-size: 1.2rem; }
+.faixa-fechar {
+  border: 0; background: transparent; cursor: pointer;
+  font-size: 1rem; line-height: 1; padding: 4px 6px;
+  border-radius: 6px; color: var(--texto-suave);
+}
+.faixa-fechar:hover { background: rgba(0, 0, 0, .06); }
+.faixa-fechar:focus-visible { outline: 2px solid var(--primaria); outline-offset: 2px; }
+
+.pagina-acompanhar .ac-cartao {
+  max-width: 620px; margin: 24px auto 40px;
+  background: var(--superficie); border: 1px solid var(--borda);
+  border-radius: var(--raio); box-shadow: var(--sombra);
+  padding: 22px;
+}
+.ac-numero { margin: 0 0 12px; color: var(--texto-suave); font-weight: 600; }
+.ac-status {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 1.35rem; font-weight: 800; line-height: 1.2;
+  padding: 14px 16px; border-radius: var(--raio-sm);
+  background: var(--superficie-2); border: 1px solid var(--borda);
+}
+.ac-status-icone { font-size: 1.5rem; }
+.ac-status-novo, .ac-status-preparo {
+  background: var(--primaria-clara); border-color: var(--primaria);
+}
+.ac-status-caminho, .ac-status-pronto {
+  background: rgba(37, 211, 102, .12); border-color: rgba(37, 211, 102, .5);
+}
+.ac-status-concluido {
+  background: var(--sucesso-fundo); border-color: var(--sucesso-borda);
+  color: var(--sucesso-texto);
+}
+.ac-status-cancelado, .ac-status-erro {
+  background: var(--perigo-fundo); border-color: var(--perigo-borda);
+  color: var(--perigo-texto);
+}
+
+.ac-passos { list-style: none; margin: 18px 0 0; padding: 0; }
+.ac-passo {
+  display: flex; gap: 12px; align-items: flex-start;
+  position: relative; padding-bottom: 18px;
+}
+.ac-passo:last-child { padding-bottom: 0; }
+.ac-bolinha {
+  flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
+  display: grid; place-items: center; font-weight: 700; font-size: .9rem;
+  background: var(--superficie-2); border: 2px solid var(--borda-forte);
+  color: var(--texto-suave);
+}
+.ac-passo-feito .ac-bolinha {
+  background: var(--sucesso); border-color: var(--sucesso); color: #fff;
+}
+.ac-passo-atual .ac-bolinha {
+  background: var(--primaria); border-color: var(--primaria); color: #fff;
+}
+.ac-passo-texto { display: flex; flex-direction: column; }
+.ac-passo-texto small { color: var(--texto-suave); }
+.ac-passo-futuro .ac-passo-texto { color: var(--texto-suave); }
+
+.ac-dica { color: var(--texto-suave); }
+.ac-form { margin-top: 16px; }
+.ac-form label { font-weight: 700; display: block; margin-bottom: 6px; }
+.ac-form-campo { display: flex; gap: 8px; }
+.ac-form-campo input {
+  flex: 1; min-width: 0; padding: 10px 12px;
+  border: 1px solid var(--borda-forte); border-radius: var(--raio-sm);
+  background: var(--superficie); color: var(--texto);
+}
+.ac-form-campo input:focus-visible { outline: 2px solid var(--primaria); outline-offset: 1px; }
+.ac-ajuda { color: var(--texto-tenue); font-size: .85rem; }
+.ac-atualizado { color: var(--texto-tenue); font-size: .82rem; margin-top: 16px; }
+.ac-voltar { margin-bottom: 0; }
+
 @media print {
-  .topo, .carrinho-flutuante, .rodape-links, .toasts, .modal-rodape { display: none !important; }
+  .topo, .carrinho-flutuante, .rodape-links, .toasts, .modal-rodape, .faixa-pedido { display: none !important; }
 }

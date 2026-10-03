@@ -26,7 +26,15 @@
   var CABECALHO_PEDIDOS = [
     'Data', 'Hora', 'Pedido', 'Cliente', 'Tipo', 'Endereco', 'Pagamento',
     'Qtd itens', 'Subtotal', 'Taxa entrega', 'TOTAL', 'Observacoes',
-    'Itens do pedido', 'Obs por item'
+    'Itens do pedido', 'Obs por item',
+    /* Colunas acrescentadas depois da primeira versao. Vao no FIM de
+       proposito: assim uma planilha ja existente nao desalinha as
+       colunas antigas. O script estende o cabecalho sozinho. */
+    'Bairro',
+    /* Status do pedido, editado pelo dono na planilha (Novo, Em
+       preparo, Saiu para entrega, Concluido, Cancelado). O cliente
+       acompanha pela pagina Acompanhar. */
+    'Status'
   ];
 
   var CABECALHO_ITENS = [
@@ -41,13 +49,23 @@
 
   var CABECALHO_CONFIG = ['Chave', 'Valor'];
 
+  /* Taxas de entrega por bairro. Uma linha por bairro; a ordem das
+     linhas e a ordem em que o cliente ve a lista no checkout. */
+  var CABECALHO_BAIRROS = ['Bairro', 'Taxa', 'Tempo', 'Ativo'];
+
+  /* Opcoes de item: uma linha por opcao. O grupo e identificado pelo
+     nome do item + nome do grupo; "Tipo" diz se o cliente escolhe uma
+     (unico) ou varias (multiplo), e "Obrigatorio" exige a escolha. */
+  var CABECALHO_OPCOES = ['Item', 'Grupo', 'Tipo', 'Opcao', 'Preco', 'Obrigatorio'];
+
   /* Mesma lista do planilha.gs. planilhaUrl e planilhaToken ficam de
      fora: a URL e o que diz onde ler, entao pedir isso a planilha
      seria circular. */
   var CAMPOS_CONFIG = [
     'nome', 'descricao', 'whatsapp', 'mensagemAbertura', 'corPrimaria',
     'simboloMoeda', 'taxaEntrega', 'pedidoMinimo', 'aberto',
-    'mensagemFechado', 'pedirNome', 'pedirEntrega'
+    'mensagemFechado', 'pedirNome', 'pedirEntrega',
+    'formasPagamento', 'tempoEntrega', 'tempoRetirada', 'enderecoLoja', 'instagram'
   ];
 
   /* ---------------------------------------------------------
@@ -325,7 +343,10 @@
       itens.map(function (i) {
         return i.quantidade + 'x ' + semAcento(i.nome) + ' (' + dinheiro(i.precoUnitario) + ')';
       }).join(' | '),
-      itens.map(function (i) { return semAcento(i.observacao); }).filter(Boolean).join(' | ')
+      itens.map(function (i) { return semAcento(i.observacao); }).filter(Boolean).join(' | '),
+      semAcento(p.bairro),
+      /* Status inicial. O dono troca na planilha depois. */
+      'Novo'
     ];
   }
 
@@ -377,6 +398,55 @@
     });
 
     return { cabecalho: CABECALHO_CARDAPIO, linhas: linhas };
+  }
+
+  /* Aba Bairros: uma linha por bairro. A taxa vai como número, para
+     o Sheets somar; uma lista vazia e perfeitamente normal e
+     significa "uso a taxa única da aba Config". */
+  function catalogoBairros() {
+    var d = window.CardapioStore.dados();
+    var lista = Array.isArray(d.bairros) ? d.bairros : [];
+
+    return {
+      cabecalho: CABECALHO_BAIRROS,
+      linhas: lista.map(function (b) {
+        return [
+          textoCelula(b.nome),
+          dinheiro(b.taxa),
+          textoCelula(b.tempo),
+          b.ativo === false ? 'Nao' : 'Sim'
+        ];
+      })
+    };
+  }
+
+  /* Aba Opcoes: uma linha por opcao de item, achatando os grupos que
+     estao dentro de cada item. O nome do item e a chave de casamento
+     com a aba Cardapio. */
+  function catalogoOpcoes() {
+    var d = window.CardapioStore.dados();
+    var linhas = [];
+
+    (d.categorias || []).forEach(function (cat) {
+      (cat.itens || []).forEach(function (item) {
+        var grupos = Array.isArray(item.opcoes) ? item.opcoes : [];
+
+        grupos.forEach(function (g) {
+          (g.itens || []).forEach(function (o) {
+            linhas.push([
+              textoCelula(item.nome),
+              textoCelula(g.grupo),
+              g.tipo === 'multiplo' ? 'multiplo' : 'unico',
+              textoCelula(o.nome),
+              dinheiro(o.preco),
+              g.obrigatorio ? 'Sim' : 'Nao'
+            ]);
+          });
+        });
+      });
+    });
+
+    return { cabecalho: CABECALHO_OPCOES, linhas: linhas };
   }
 
   /* Campos que vão para a aba Config gravados como número, e os
@@ -437,6 +507,15 @@
 
       return [chave, textoCelula(v)];
     });
+
+    /* Registro de onde este cardapio foi publicado e com que token.
+       Fica gravado na propria planilha para o dono conferir, mas
+       NUNCA e lido de volta (nao esta em CAMPOS_CONFIG, que e a lista
+       usada pelo GET). Assim o token continua secreto: a planilha e
+       privada, e o GET publico nao devolve estas duas linhas. */
+    var conexao = cfg();
+    linhas.push(['url-do-web-app', textoCelula(conexao.planilhaUrl || '')]);
+    linhas.push(['token-do-script', textoCelula(conexao.planilhaToken || '')]);
 
     /* Uma linha de comentario no fim, com a data da publicacao.
        E o que o dono ve para saber se o cardapio do cliente esta
@@ -520,6 +599,7 @@
       cliente: pedido.cliente,
       tipo: pedido.tipo,
       endereco: pedido.endereco,
+      bairro: pedido.bairro,
       pagamento: pedido.pagamento,
       observacoes: pedido.observacoes,
       subtotal: pedido.subtotal,
@@ -673,6 +753,68 @@
   }
 
   /* ---------------------------------------------------------
+     3d. Status de um pedido (página Acompanhar)
+     ---------------------------------------------------------
+     Diferente do cardápio, aqui a resposta é pequena e o cliente
+     fica perguntando de novo a cada poucos segundos. Um fetch
+     simples com timeout resolve: sem timeout, uma rede caída
+     deixaria a tela em "consultando..." para sempre.
+     --------------------------------------------------------- */
+  function statusDoPedido(id) {
+    if (!configurada()) return Promise.resolve({ ignorado: true, motivo: 'sem-url' });
+
+    var alvo = String(id === null || id === undefined ? '' : id).trim();
+    if (!alvo) return Promise.resolve({ ok: false, erro: 'Informe o número do pedido.' });
+
+    var chave = token();
+    var extra = 'pedido=' + encodeURIComponent(alvo) +
+      (chave ? '&token=' + encodeURIComponent(chave) : '');
+    var url = comParams(extra);
+
+    return new Promise(function (resolve) {
+      var pronto = false;
+
+      function responder(r) {
+        if (pronto) return;
+        pronto = true;
+        resolve(r);
+      }
+
+      setTimeout(function () {
+        responder({ ok: false, erro: 'Tempo esgotado ao consultar o pedido.' });
+      }, 8000);
+
+      fetch(url, { credentials: 'omit', redirect: 'follow' })
+        .then(function (resp) {
+          if (!resp.ok) {
+            responder({ ok: false, definido: true, erro: 'A planilha respondeu ' + resp.status + '.' });
+            return null;
+          }
+          return resp.json();
+        })
+        .then(function (json) {
+          if (json === null) return;
+          if (!json || json.ok !== true) {
+            responder({
+              ok: false, definido: true,
+              erro: (json && json.erro) || 'Resposta inesperada do script.'
+            });
+            return;
+          }
+          responder({
+            ok: true,
+            pedido: json.pedido || alvo,
+            status: json.status || 'Novo',
+            encontrado: json.encontrado !== false
+          });
+        })
+        .catch(function (e) {
+          responder({ ok: false, erro: 'Falha de rede ao consultar o pedido: ' + (e && e.message ? e.message : e) });
+        });
+    });
+  }
+
+  /* ---------------------------------------------------------
      3c. Aplicar o que veio da planilha
      --------------------------------------------------------- */
 
@@ -706,7 +848,11 @@
             descricao: String(item.descricao || ''),
             imagem: String(item.imagem || ''),
             destaque: item.destaque === true,
-            disponivel: item.disponivel !== false
+            disponivel: item.disponivel !== false,
+            /* As opcoes vem anexadas ao item pelo script (aba Opcoes).
+               Passam cruas daqui; a normalizacao do Store cuida do
+               formato. Sem opcoes, a lista vazia nao vira chave. */
+            opcoes: Array.isArray(item.opcoes) ? item.opcoes : []
           };
         })
       };
@@ -715,28 +861,46 @@
     });
   }
 
-  /* Traduz a resposta do script em dois "patches". Separate de
+  function montarBairros(lista) {
+    return lista.map(function (b) {
+      return {
+        nome: String(b.nome !== undefined ? b.nome : (b.bairro || '')).trim(),
+        taxa: b.taxa,
+        tempo: String(b.tempo || ''),
+        ativo: b.ativo !== false
+      };
+    }).filter(function (b) { return b.nome; });
+  }
+
+  /* Traduz a resposta do script em "patches". Separate de
      proposito: quem decide se pode sobrescrever o que esta na
-     tela precisa olhar o patch antes de aplicá-lo. */
+     tela precisa olhar o patch antes de aplicá-lo.
+
+     Bairros ausente na resposta (aba inexistente) vira null: nao
+     apaga o que ja esta na tela. Lista vazia e valida e significa
+     "sem bairros cadastrados". */
   function montarPatches(resposta) {
     var menu = resposta && Array.isArray(resposta.menu) ? resposta.menu : null;
     var config = resposta && resposta.config && typeof resposta.config === 'object'
       ? resposta.config
       : null;
+    var bairros = resposta && Array.isArray(resposta.bairros) ? montarBairros(resposta.bairros) : null;
 
     return {
       config: config,
-      categorias: menu && menu.length ? montarCategorias(menu) : null
+      categorias: menu && menu.length ? montarCategorias(menu) : null,
+      bairros: bairros
     };
   }
 
   function temConteudo(patches) {
-    return !!(patches.config || patches.categorias);
+    return !!(patches.config || patches.categorias || patches.bairros);
   }
 
   function aplicarPatches(d, patches) {
     if (patches.config) aplicarConfig(d.config, patches.config);
     if (patches.categorias) d.categorias = patches.categorias;
+    if (patches.bairros) d.bairros = patches.bairros;
   }
 
   function contaItens(categorias) {
@@ -826,7 +990,19 @@
       config[chave] = d && d.config ? d.config[chave] : undefined;
     });
 
-    return JSON.stringify({ config: config, categorias: d ? d.categorias : [] });
+    /* Os bairros entram na comparacao sem o "id" (que e gerado):
+       assim comparar o que esta na tela com o que veio da planilha
+       nao acusa diferenca so porque o id foi recalculado. */
+    var bairros = (d && Array.isArray(d.bairros) ? d.bairros : []).map(function (b) {
+      return {
+        nome: b.nome,
+        taxa: b.taxa,
+        tempo: b.tempo,
+        ativo: b.ativo !== false
+      };
+    });
+
+    return JSON.stringify({ config: config, categorias: d ? d.categorias : [], bairros: bairros });
   }
 
   function impressao() {
@@ -862,13 +1038,18 @@
     }
 
     var conf = tabelaConfig();
+    var bai = catalogoBairros();
+    var opc = catalogoOpcoes();
 
-    /* Um POST so com as duas abas: se a rede falhar no meio, o
-       script processa na ordem e o cardapio fica consistente com
-       a configuracao. */
+    /* Um POST so com as abas: se a rede falhar no meio, o script
+       processa na ordem e o cardapio fica consistente com a
+       configuracao. Bairros e Opcoes vao sempre, mesmo vazias, para
+       limpar o que o dono apagou. */
     return postar('cardapio', [
       { nome: 'Cardápio', modo: 'replace', cabecalho: cat.cabecalho, linhas: cat.linhas },
-      { nome: 'Config', modo: 'replace', cabecalho: conf.cabecalho, linhas: conf.linhas }
+      { nome: 'Config', modo: 'replace', cabecalho: conf.cabecalho, linhas: conf.linhas },
+      { nome: 'Bairros', modo: 'replace', cabecalho: bai.cabecalho, linhas: bai.linhas },
+      { nome: 'Opcoes', modo: 'replace', cabecalho: opc.cabecalho, linhas: opc.linhas }
     ]).then(function (r) {
       r.itens = cat.linhas.length;
       marcarPublicado();
@@ -881,11 +1062,14 @@
     enviarPedido: enviarPedido,
     enviarCardapio: enviarCardapio,
     lerCardapio: lerCardapio,
+    statusDoPedido: statusDoPedido,
     aplicarCardapio: aplicarCardapio,
     comparar: comparar,
     pendentes: alteracoesPendentes,
     marcarPublicado: marcarPublicado,
     catalogo: catalogo,
+    catalogoBairros: catalogoBairros,
+    catalogoOpcoes: catalogoOpcoes,
     tabelaConfig: tabelaConfig,
     ultimoEnvio: ultimoEnvio,
     enderecosDeImagem: enderecosDeImagem,
@@ -895,7 +1079,9 @@
       pedidos: CABECALHO_PEDIDOS,
       itens: CABECALHO_ITENS,
       cardapio: CABECALHO_CARDAPIO,
-      config: CABECALHO_CONFIG
+      config: CABECALHO_CONFIG,
+      bairros: CABECALHO_BAIRROS,
+      opcoes: CABECALHO_OPCOES
     },
     camposConfig: CAMPOS_CONFIG
   };

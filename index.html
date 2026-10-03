@@ -36,6 +36,12 @@
   </header>
 
   <main class="container" id="conteudo">
+    <div class="faixa-pedido oculto" id="faixaPedido">
+      <span class="faixa-icone" aria-hidden="true">🛵</span>
+      <a id="faixaPedidoLink" href="acompanhar.html">Acompanhar pedido <strong id="faixaPedidoNum"></strong></a>
+      <button type="button" class="faixa-fechar" id="faixaPedidoFechar" aria-label="Ocultar acompanhamento">✕</button>
+    </div>
+
     <div class="aviso-fechado" id="avisoFechado" hidden>
       <span aria-hidden="true">🌙</span>
       <div>
@@ -62,6 +68,7 @@
       <p>Faça seu pedido e receba direto no WhatsApp. Sem cadastro, sem app.</p>
       <div class="rodape-links">
         <a href="admin.html">Área do dono</a>
+        <a href="acompanhar.html">Acompanhar pedido</a>
         <a href="#" id="linkBaixarJson">Baixar cardápio (JSON)</a>
       </div>
     </div>

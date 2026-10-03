@@ -9,12 +9,22 @@
 
   var CHAVE_CARRINHO = 'cardapio:carrinho:v1';
   var CHAVE_CLIENTE = 'cardapio:cliente:v1';
+  /* Ultimo pedido enviado, para a faixa "Acompanhar pedido" nao
+     desaparecer quando o cliente fecha a aba. */
+  var CHAVE_PEDIDO = 'cardapio:pedido:atual';
 
   var el = {};
-  var carrinho = [];   /* [{ id, qtd, obs }] */
+  var carrinho = [];   /* [{ id, qtd, obs, opcoes }] */
   var cliente = {};    /* dados do cliente para o pedido */
   var busca = '';
   var modoCheckout = false;
+  /* Rascunho da escolha de opcoes aberta no modal (null quando
+     fechado): { id, qtd, escolhas, indiceEdicao }. */
+  var opcoesRascunho = null;
+  /* O numero do pedido e sorteado UMA vez, no envio, e reaproveitado
+     na mensagem e na planilha. Sem isso, a mensagem do WhatsApp e a
+     linha gravada no Google sairiam com numeros diferentes. */
+  var pedidoAtual = '';
 
   /* =========================================================
      Utilitarios
@@ -355,7 +365,11 @@
   }
 
   function cartao(item, cat, cfg) {
-    var noCarrinho = quantidade(item.id);
+    /* Item com opcoes nunca usa o contador rapido do cartao: as
+       escolhas podem gerar varias linhas, entao ele sempre passa pelo
+       botao. */
+    var opcional = temOpcoes(item);
+    var noCarrinho = opcional ? 0 : quantidade(item.id);
 
     return '' +
     '<article class="cartao' + (noCarrinho ? '' : '') + '">' +
@@ -378,15 +392,20 @@
     if (item.disponivel === false || !Store.dados().config.aberto) {
       return '<button type="button" class="btn btn-sm btn-contorno" disabled>Indisponível</button>';
     }
-    return '<button type="button" class="btn btn-sm btn-primario" data-add="' + esc(item.id) + '">+ Adicionar</button>';
+    var rotulo = temOpcoes(item) ? 'Escolher' : '+ Adicionar';
+    return '<button type="button" class="btn btn-sm btn-primario" data-add="' + esc(item.id) + '">' + rotulo + '</button>';
   }
 
-  function contador(id, qtd) {
+  function contador(id, qtd, indiceLinha) {
+    var marca = (indiceLinha === undefined || indiceLinha === null)
+      ? ''
+      : ' data-linha="' + indiceLinha + '"';
+
     return '' +
     '<span class="quantidade">' +
-      '<button type="button" data-dec="' + esc(id) + '" aria-label="Diminuir quantidade">−</button>' +
+      '<button type="button" data-dec="' + esc(id) + '"' + marca + ' aria-label="Diminuir quantidade">−</button>' +
       '<output aria-label="Quantidade">' + qtd + '</output>' +
-      '<button type="button" data-inc="' + esc(id) + '" aria-label="Aumentar quantidade">+</button>' +
+      '<button type="button" data-inc="' + esc(id) + '"' + marca + ' aria-label="Aumentar quantidade">+</button>' +
     '</span>';
   }
 
@@ -405,8 +424,23 @@
     } else {
       var achada = carrinho.filter(function (l) { return l.id === id; })[0];
       if (achada) achada.qtd = Math.min(99, nova);
-      else carrinho.push({ id: id, qtd: 1, obs: '' });
+      else carrinho.push({ id: id, qtd: 1, obs: '', opcoes: [] });
     }
+    salvarCarrinho();
+    render();
+    if (modoCheckout) renderModal();
+  }
+
+  /* Muda a quantidade de UMA linha do carrinho (pelo indice), porque
+     o mesmo item pode aparecer em varias linhas com opcoes diferentes. */
+  function alterarLinha(indice, delta) {
+    var linha = carrinho[indice];
+    if (!linha) return;
+
+    var nova = linha.qtd + delta;
+    if (nova <= 0) carrinho.splice(indice, 1);
+    else linha.qtd = Math.min(99, nova);
+
     salvarCarrinho();
     render();
     if (modoCheckout) renderModal();
@@ -415,15 +449,52 @@
   function addItem(id) {
     var achado = acharItem(id);
     if (!achado || achado.item.disponivel === false) return;
+
+    /* Item com opcoes: passa pela escolha antes de entrar. */
+    if (temOpcoes(achado.item)) { abrirOpcoes(id); return; }
+
     alterarQtd(id, 1);
     avisar(achado.item.nome + ' adicionado 🛒', 'ok');
   }
 
   function subtotal() {
     return carrinho.reduce(function (soma, linha) {
-      var achado = acharItem(linha.id);
-      return soma + (achado ? achado.item.preco * linha.qtd : 0);
+      return soma + precoUnitarioLinha(linha) * linha.qtd;
     }, 0);
+  }
+
+  /* ---------- opcoes de item ----------
+     Um item com opcoes nao entra direto no carrinho: abre a escolha.
+     Cada linha guarda as opcoes escolhidas em `opcoes`
+     ([{grupo, opcao, preco}]) e o preco da linha e o base do item
+     mais a soma dessas opcoes. Duas linhas do mesmo item com
+     escolhas diferentes convivem no carrinho. */
+  function temOpcoes(item) {
+    return !!(item && Array.isArray(item.opcoes) && item.opcoes.length);
+  }
+
+  function assinaturaOpcoes(id, ops) {
+    var marcas = (ops || []).map(function (o) {
+      return (o.grupo || '') + '=' + (o.opcao || '');
+    });
+    marcas.sort();
+    return id + '|' + marcas.join(';');
+  }
+
+  function precoUnitarioLinha(linha) {
+    var achado = acharItem(linha.id);
+    var base = achado ? achado.item.preco : 0;
+    var extras = (linha.opcoes || []).reduce(function (soma, o) {
+      return soma + (Number(o.preco) || 0);
+    }, 0);
+    return base + extras;
+  }
+
+  function rotuloOpcoes(linha) {
+    if (!linha.opcoes || !linha.opcoes.length) return '';
+    return linha.opcoes.map(function (o) {
+      return o.grupo + ': ' + o.opcao;
+    }).join(' · ');
   }
 
   function totalItens() {
@@ -435,8 +506,33 @@
     return cliente.tipo === 'retirada';
   }
 
+  /* [lista de bairros com taxa, so os ativos] */
+  function bairrosAtivos() {
+    return (Store.dados().bairros || []).filter(function (b) {
+      return b.ativo !== false;
+    });
+  }
+
+  /* [bairro escolhido no checkout, ou null] */
+  function bairroEscolhido() {
+    if (ehRetirada() || !cliente.bairro) return null;
+    var achados = bairrosAtivos().filter(function (b) { return b.nome === cliente.bairro; });
+    return achados[0] || null;
+  }
+
+  /* A taxa do bairro vence a taxa unica da Config. Sem bairros
+     cadastrados (ou sem escolha) cai na taxa de entrega de sempre. */
   function taxaAplicada() {
-    return ehRetirada() ? 0 : (Store.dados().config.taxaEntrega || 0);
+    if (ehRetirada()) return 0;
+    var b = bairroEscolhido();
+    if (b) return b.taxa;
+    return Store.dados().config.taxaEntrega || 0;
+  }
+
+  /* Rotulo da taxa, com o bairro entre parenteses quando houver. */
+  function rotuloTaxa() {
+    var b = bairroEscolhido();
+    return b ? 'Taxa de entrega (' + b.nome + ')' : 'Taxa de entrega';
   }
 
   function totalGeral() {
@@ -471,11 +567,215 @@
     el.overlay.classList.add('oculto');
     document.body.classList.remove('travado');
     modoCheckout = false;
+    opcoesRascunho = null;
   }
 
   function renderModal() {
     if (modoCheckout) return renderCheckout();
     renderCarrinho();
+  }
+
+  /* =========================================================
+     Modal de opcoes do item
+     ========================================================= */
+  function escolhaFeita(grupo, opcao) {
+    var g = opcoesRascunho && opcoesRascunho.escolhas[grupo];
+    return !!(g && g[opcao]);
+  }
+
+  /* Uma opcao esta marcada se foi escolhida; o grupo obrigatorio
+     precisa de pelo menos uma. */
+  function opcoesValidas() {
+    if (!opcoesRascunho) return false;
+    var achado = acharItem(opcoesRascunho.id);
+    if (!achado) return false;
+
+    return (achado.item.opcoes || []).every(function (g) {
+      if (!g.obrigatorio) return true;
+      var escolhidas = opcoesRascunho.escolhas[g.grupo] || {};
+      return Object.keys(escolhidas).some(function (k) { return escolhidas[k]; });
+    });
+  }
+
+  /* Preco base + opcoes, ja multiplicado pela quantidade. */
+  function resumoPrecos() {
+    var achado = opcoesRascunho ? acharItem(opcoesRascunho.id) : null;
+    var base = achado ? achado.item.preco : 0;
+    var extras = 0;
+
+    if (achado) {
+      (achado.item.opcoes || []).forEach(function (g) {
+        (g.itens || []).forEach(function (o) {
+          if (escolhaFeita(g.grupo, o.nome)) extras += Number(o.preco) || 0;
+        });
+      });
+    }
+
+    var unit = base + extras;
+    return { base: base, extras: extras, unit: unit, total: unit * (opcoesRascunho ? opcoesRascunho.qtd : 1) };
+  }
+
+  function abrirOpcoes(id, indiceEdicao) {
+    var achado = acharItem(id);
+    if (!achado || !temOpcoes(achado.item)) return;
+
+    var editando = (indiceEdicao !== undefined && indiceEdicao !== null);
+    var linha = editando ? carrinho[indiceEdicao] : null;
+    var escolhas = {};
+
+    if (linha) {
+      (linha.opcoes || []).forEach(function (o) {
+        escolhas[o.grupo] = escolhas[o.grupo] || {};
+        escolhas[o.grupo][o.opcao] = true;
+      });
+    }
+
+    opcoesRascunho = {
+      id: id,
+      qtd: linha ? linha.qtd : 1,
+      escolhas: escolhas,
+      indiceEdicao: linha ? indiceEdicao : null
+    };
+
+    renderOpcoes();
+  }
+
+  function renderOpcoes() {
+    var achado = acharItem(opcoesRascunho.id);
+    var item = achado.item;
+    var corpo = '<div class="empilha">' +
+      '<p class="opcoes-item-nome">' + esc(item.nome) + '</p>';
+
+    (item.opcoes || []).forEach(function (g) {
+      var tipo = g.tipo === 'multiplo' ? 'multiplo' : 'unico';
+
+      corpo += '<fieldset class="grupo-opcoes"><legend>' + esc(g.grupo) +
+        ' <span class="' + (g.obrigatorio ? 'op-obrig' : 'op-opcional') + '">' +
+        (g.obrigatorio ? 'obrigatório' : 'opcional') + '</span></legend>';
+
+      (g.itens || []).forEach(function (o) {
+        corpo += '<label class="opcao-escolha">' +
+          '<input type="' + (tipo === 'multiplo' ? 'checkbox' : 'radio') + '"' +
+            ' name="og-' + esc(g.grupo) + '"' +
+            ' data-op-escolha data-op-grupo="' + esc(g.grupo) + '"' +
+            ' data-op-opcao="' + esc(o.nome) + '" data-op-tipo="' + tipo + '"' +
+            (escolhaFeita(g.grupo, o.nome) ? ' checked' : '') + '>' +
+          '<span class="opcao-nome">' + esc(o.nome) + '</span>' +
+          (Number(o.preco) > 0 ? '<span class="opcao-preco">+ ' + moeda(o.preco) + '</span>' : '') +
+        '</label>';
+      });
+
+      corpo += '</fieldset>';
+    });
+
+    corpo += '<div class="campo campo-qtd"><span>Quantidade</span>' +
+      '<span class="quantidade">' +
+        '<button type="button" data-op-dec aria-label="Diminuir quantidade">−</button>' +
+        '<output aria-label="Quantidade">' + opcoesRascunho.qtd + '</output>' +
+        '<button type="button" data-op-inc aria-label="Aumentar quantidade">+</button>' +
+      '</span></div>' +
+      '<div class="totais" id="opResumo"></div>' +
+      '</div>';
+
+    abrirModal('Escolher opções', corpo,
+      '<button type="button" class="btn btn-primario btn-bloco" data-op-confirmar>Adicionar</button>' +
+      '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Cancelar</button>');
+
+    atualizarResumoOpcoes();
+  }
+
+  function atualizarResumoOpcoes() {
+    if (!opcoesRascunho) return;
+    var r = resumoPrecos();
+
+    var resumo = el.modalCorpo.querySelector('#opResumo');
+    if (resumo) {
+      resumo.innerHTML =
+        '<div><span>Unitário</span><span>' + moeda(r.unit) + '</span></div>' +
+        (r.extras > 0 ? '<div><span>Opções</span><span>+ ' + moeda(r.extras) + '</span></div>' : '') +
+        '<div class="total-final"><span>' + opcoesRascunho.qtd + 'x Total</span><span>' + moeda(r.total) + '</span></div>';
+    }
+
+    var btn = el.modalRodape.querySelector('[data-op-confirmar]');
+    if (btn) {
+      btn.disabled = !opcoesValidas();
+      btn.textContent = 'Adicionar · ' + moeda(r.total);
+    }
+  }
+
+  function aplicarEscolhaOpcao(input) {
+    if (!opcoesRascunho) return;
+
+    var grupo = input.getAttribute('data-op-grupo');
+    var opcao = input.getAttribute('data-op-opcao');
+    var tipo = input.getAttribute('data-op-tipo');
+
+    if (tipo === 'multiplo') {
+      opcoesRascunho.escolhas[grupo] = opcoesRascunho.escolhas[grupo] || {};
+      if (input.checked) opcoesRascunho.escolhas[grupo][opcao] = true;
+      else delete opcoesRascunho.escolhas[grupo][opcao];
+    } else {
+      opcoesRascunho.escolhas[grupo] = {};
+      if (input.checked) opcoesRascunho.escolhas[grupo][opcao] = true;
+    }
+
+    atualizarResumoOpcoes();
+  }
+
+  function mudarQtdOpcoes(delta) {
+    if (!opcoesRascunho) return;
+    opcoesRascunho.qtd = Math.max(1, Math.min(99, opcoesRascunho.qtd + delta));
+
+    var saida = el.modalCorpo.querySelector('.campo-qtd output');
+    if (saida) saida.textContent = opcoesRascunho.qtd;
+
+    atualizarResumoOpcoes();
+  }
+
+  function editarOpcoesLinha(indice) {
+    var linha = carrinho[indice];
+    if (linha) abrirOpcoes(linha.id, indice);
+  }
+
+  /* Fecha a escolha e lanca no carrinho. Edicao troca a linha no
+     lugar; adicao se junta a uma linha igual, se existir. */
+  function confirmarOpcoes() {
+    if (!opcoesRascunho) return;
+    if (!opcoesValidas()) { avisar('Escolha as opções obrigatórias.', 'erro'); return; }
+
+    var achado = acharItem(opcoesRascunho.id);
+    if (!achado) return;
+
+    var escolhidas = [];
+    (achado.item.opcoes || []).forEach(function (g) {
+      (g.itens || []).forEach(function (o) {
+        if (escolhaFeita(g.grupo, o.nome)) {
+          escolhidas.push({ grupo: g.grupo, opcao: o.nome, preco: Number(o.preco) || 0 });
+        }
+      });
+    });
+
+    var qtd = opcoesRascunho.qtd;
+    var indice = opcoesRascunho.indiceEdicao;
+
+    if (indice !== null && indice !== undefined && carrinho[indice]) {
+      carrinho[indice].opcoes = escolhidas;
+      carrinho[indice].qtd = qtd;
+    } else {
+      var chave = assinaturaOpcoes(achado.item.id, escolhidas);
+      var existente = null;
+      carrinho.forEach(function (l) {
+        if (assinaturaOpcoes(l.id, l.opcoes || []) === chave) existente = l;
+      });
+
+      if (existente) existente.qtd = Math.min(99, existente.qtd + qtd);
+      else carrinho.push({ id: achado.item.id, qtd: qtd, obs: '', opcoes: escolhidas });
+    }
+
+    opcoesRascunho = null;
+    salvarCarrinho();
+    renderCarrinho();
+    avisar(achado.item.nome + ' adicionado 🛒', 'ok');
   }
 
   function renderCarrinho() {
@@ -492,29 +792,34 @@
     var cfg = Store.dados().config;
     var corpo = '';
 
-    carrinho.forEach(function (linha) {
+    carrinho.forEach(function (linha, i) {
       var achado = acharItem(linha.id);
       if (!achado) return;
       var item = achado.item;
+      var precoUnit = precoUnitarioLinha(linha);
+      var rotulo = rotuloOpcoes(linha);
 
       corpo += '' +
       '<div class="linha">' +
         '<div class="linha-emoji">' + emojiDoItem(item, achado.categoria) + '</div>' +
         '<div class="linha-info">' +
           '<p class="linha-nome">' + esc(item.nome) + '</p>' +
-          '<p class="linha-preco-unit">' + moeda(item.preco) + ' cada</p>' +
-          '<div class="linha-acoes">' + contador(item.id, linha.qtd) +
-            '<span class="linha-total">' + moeda(item.preco * linha.qtd) + '</span>' +
+          '<p class="linha-preco-unit">' + moeda(precoUnit) + ' cada</p>' +
+          (rotulo ? '<p class="linha-opcoes">' + esc(rotulo) + '</p>' : '') +
+          '<div class="linha-acoes">' + contador(item.id, linha.qtd, i) +
+            (temOpcoes(item) ?
+              '<button type="button" class="btn-link" data-editar-opcoes="' + i + '">Editar opções</button>' : '') +
+            '<span class="linha-total">' + moeda(precoUnit * linha.qtd) + '</span>' +
           '</div>' +
           '<input type="text" class="obs-item" placeholder="Observação (ex.: sem cebola)" ' +
-            'value="' + esc(linha.obs) + '" data-obs="' + esc(item.id) + '" maxlength="140">' +
+            'value="' + esc(linha.obs) + '" data-obs-linha="' + i + '" maxlength="140">' +
         '</div>' +
       '</div>';
     });
 
     corpo += '<div class="totais" style="margin-top:16px">' +
       '<div><span>Subtotal (' + totalItens() + ' itens)</span><span>' + moeda(subtotal()) + '</span></div>' +
-      (taxaAplicada() > 0 ? '<div><span>Taxa de entrega</span><span>' + moeda(taxaAplicada()) + '</span></div>' : '') +
+      (taxaAplicada() > 0 ? '<div><span>' + rotuloTaxa() + '</span><span>' + moeda(taxaAplicada()) + '</span></div>' : '') +
       '<div class="total-final"><span>Total</span><span>' + moeda(totalGeral()) + '</span></div>' +
       '</div>';
 
@@ -539,6 +844,54 @@
     return Math.max(0, minimo - subtotal());
   }
 
+  /* Seletor de bairro: so aparece se ha bairros ativos cadastrados.
+     O valor guardado e o NOME (legivel na mensagem e na planilha). */
+  function campoBairro() {
+    var lista = bairrosAtivos();
+    if (!lista.length) return '';
+
+    var atual = cliente.bairro || '';
+    var opcoes = lista.map(function (b) {
+      var rotulo = b.nome;
+      if (b.taxa > 0) rotulo += ' — ' + moeda(b.taxa);
+      if (b.tempo) rotulo += ' · ' + b.tempo;
+      return '<option value="' + esc(b.nome) + '"' + (b.nome === atual ? ' selected' : '') + '>' +
+        esc(rotulo) + '</option>';
+    }).join('');
+
+    return '<div class="campo"><label for="coBairro">Bairro de entrega</label>' +
+      '<select id="coBairro">' +
+        '<option value="">Selecione o bairro…</option>' + opcoes +
+      '</select></div>';
+  }
+
+  /* Forma de pagamento: vira lista quando a Config traz
+     "formasPagamento" (separadas por virgula, ponto e virgula ou
+     barra); senao continua texto livre. */
+  function campoPagamento() {
+    var cfg = Store.dados().config;
+    var lista = String(cfg.formasPagamento || '')
+      .split(/[|,;]/)
+      .map(function (s) { return s.trim(); })
+      .filter(Boolean);
+
+    if (!lista.length) {
+      return '<div class="campo"><label for="coPagamento">Forma de pagamento</label>' +
+        '<input type="text" id="coPagamento" placeholder="Ex.: Pix, dinheiro, cartão" value="' +
+        esc(cliente.pagamento || '') + '"></div>';
+    }
+
+    var atual = cliente.pagamento || '';
+    var opcoes = lista.map(function (o) {
+      return '<option value="' + esc(o) + '"' + (o === atual ? ' selected' : '') + '>' + esc(o) + '</option>';
+    }).join('');
+
+    return '<div class="campo"><label for="coPagamento">Forma de pagamento</label>' +
+      '<select id="coPagamento">' +
+        '<option value="">Selecione…</option>' + opcoes +
+      '</select></div>';
+  }
+
   function renderCheckout() {
     modoCheckout = true;
     var cfg = Store.dados().config;
@@ -555,11 +908,13 @@
           '<label class="opcao"><input type="radio" name="coTipo" value="retirada"' + (cliente.tipo === 'retirada' ? ' checked' : '') + '><span>🏠 Retirada</span></label>' +
         '</div></div>' +
 
-        '<div class="campo" id="coEnderecoBox"><label for="coEndereco">Endereço de entrega</label>' +
-        '<input type="text" id="coEndereco" placeholder="Rua, número, bairro, complemento" value="' + esc(cliente.endereco || '') + '"></div>' +
+        '<div id="coEnderecoBox">' +
+          '<div class="campo"><label for="coEndereco">Endereço de entrega</label>' +
+          '<input type="text" id="coEndereco" placeholder="Rua, número e complemento" value="' + esc(cliente.endereco || '') + '"></div>' +
+          campoBairro() +
+        '</div>' +
 
-        '<div class="campo"><label for="coPagamento">Forma de pagamento</label>' +
-        '<input type="text" id="coPagamento" placeholder="Ex.: Pix, dinheiro, cartão" value="' + esc(cliente.pagamento || '') + '"></div>' +
+        campoPagamento() +
 
         '<div class="campo"><label for="coObs">Observações gerais</label>' +
         '<textarea id="coObs" placeholder="Ex.: tocar o interfone, sem cebola no lanche…" maxlength="300">' + esc(cliente.obs || '') + '</textarea></div>' +
@@ -588,7 +943,54 @@
     cliente.pagamento = (el.modalCorpo.querySelector('#coPagamento') || {}).value || '';
     cliente.obs = (el.modalCorpo.querySelector('#coObs') || {}).value || '';
 
+    /* Bairro: só faz sentido na entrega, e só existe seletor quando
+       há bairros cadastrados. Em retirada, limpa. */
+    var selBairro = el.modalCorpo.querySelector('#coBairro');
+    if (ehRetirada()) cliente.bairro = '';
+    else if (selBairro) cliente.bairro = selBairro.value || '';
+
     salvarCarrinho();
+  }
+
+  /* ---------- acompanhamento do pedido ----------
+     A pagina Acompanhar consulta o status na planilha. A faixa aqui
+     so aponta para ela; quem some e ela mesma. */
+  function lerPedidoSalvo() {
+    try {
+      var bruto = localStorage.getItem(CHAVE_PEDIDO);
+      if (!bruto) return null;
+      var dado = JSON.parse(bruto);
+      if (!dado || !dado.pedido) return null;
+      /* Um pedido de ontem nao interessa mais: some sozinho. */
+      if (dado.quando && Date.now() - dado.quando > 24 * 60 * 60 * 1000) return null;
+      return dado;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function guardarPedido(id) {
+    if (!id) return;
+    try {
+      localStorage.setItem(CHAVE_PEDIDO, JSON.stringify({ pedido: id, quando: Date.now() }));
+    } catch (e) { /* sem storage: a faixa apenas nao aparece */
+    }
+    renderFaixaPedido();
+  }
+
+  function esconderFaixa() {
+    try { localStorage.removeItem(CHAVE_PEDIDO); } catch (e) { /* ignora */ }
+    if (el.faixaPedido) el.faixaPedido.classList.add('oculto');
+  }
+
+  function renderFaixaPedido() {
+    if (!el.faixaPedido) return;
+    var dado = lerPedidoSalvo();
+    if (!dado) { el.faixaPedido.classList.add('oculto'); return; }
+
+    el.faixaPedidoNum.textContent = '#' + dado.pedido;
+    el.faixaPedidoLink.setAttribute('href', 'acompanhar.html?pedido=' + encodeURIComponent(dado.pedido));
+    el.faixaPedido.classList.remove('oculto');
   }
 
   /* ---------- mensagem do WhatsApp ---------- */
@@ -604,7 +1006,7 @@
     var linhas = [];
 
     linhas.push('*' + cfg.nome + ' — PEDIDO*');
-    linhas.push('Pedido #' + numeroPedido());
+    linhas.push('Pedido #' + (pedidoAtual || numeroPedido()));
 
     if (cliente.nome) linhas.push('*Cliente:* ' + cliente.nome);
     linhas.push('');
@@ -614,17 +1016,27 @@
       var achado = acharItem(linha.id);
       if (!achado) return;
       linhas.push('');
-      linhas.push((i + 1) + '. ' + linha.qtd + 'x ' + achado.item.nome + ' — ' + moeda(achado.item.preco * linha.qtd));
+      linhas.push((i + 1) + '. ' + linha.qtd + 'x ' + achado.item.nome + ' — ' + moeda(precoUnitarioLinha(linha) * linha.qtd));
+
+      (linha.opcoes || []).forEach(function (o) {
+        linhas.push('   • ' + o.grupo + ': ' + o.opcao + (Number(o.preco) > 0 ? ' (+' + moeda(o.preco) + ')' : ''));
+      });
+
       if (linha.obs) linhas.push('   _obs: ' + linha.obs + '_');
     });
 
     linhas.push('');
     linhas.push('*Resumo*');
     linhas.push('Subtotal: ' + moeda(subtotal()));
-    if (taxaAplicada() > 0) linhas.push('Taxa de entrega: ' + moeda(taxaAplicada()));
+    if (taxaAplicada() > 0) linhas.push(rotuloTaxa() + ': ' + moeda(taxaAplicada()));
     linhas.push('*TOTAL: ' + moeda(totalGeral()) + '*');
 
-    if (cliente.tipo) linhas.push('\n*Entrega:* ' + (cliente.tipo === 'retirada' ? 'Retirada no local' : 'Entrega em ' + (cliente.endereco || 'a combinar')));
+    if (cliente.tipo) {
+      linhas.push('\n*Entrega:* ' + (ehRetirada() ? 'Retirada no local' : 'Entrega em ' + (cliente.endereco || 'a combinar')));
+      if (!ehRetirada() && cliente.bairro) linhas.push('*Bairro:* ' + cliente.bairro);
+      var previsao = ehRetirada() ? cfg.tempoRetirada : cfg.tempoEntrega;
+      if (previsao) linhas.push('*Previsão:* ' + previsao);
+    }
     if (cliente.pagamento) linhas.push('*Pagamento:* ' + cliente.pagamento);
     if (cliente.obs) linhas.push('\n*Observações:* ' + cliente.obs);
 
@@ -642,7 +1054,7 @@
     if (totais) {
       totais.innerHTML =
         '<div><span>Subtotal (' + totalItens() + ' itens)</span><span>' + moeda(subtotal()) + '</span></div>' +
-        (taxaAplicada() > 0 ? '<div><span>Taxa de entrega</span><span>' + moeda(taxaAplicada()) + '</span></div>' : '') +
+        (taxaAplicada() > 0 ? '<div><span>' + rotuloTaxa() + '</span><span>' + moeda(taxaAplicada()) + '</span></div>' : '') +
         '<div class="total-final"><span>Total</span><span>' + moeda(totalGeral()) + '</span></div>';
     }
   }
@@ -665,6 +1077,10 @@
       return;
     }
 
+    /* Sorteia o numero do pedido uma unica vez. A mensagem do
+       WhatsApp e a linha da planilha usam este mesmo valor. */
+    pedidoAtual = numeroPedido();
+
     var texto = encodeURIComponent(montarMensagem());
     var link = 'https://wa.me/' + cfg.whatsapp + '?text=' + texto;
 
@@ -672,9 +1088,18 @@
 
     avisar('Abrindo o WhatsApp… ✅', 'ok');
     registrarPlanilha();
+
+    /* So guarda o pedido quando da mesmo para acompanhar: sem
+       planilha configurada, a pagina Acompanhar nao teria o que
+       consultar. */
+    if (window.CardapioPlanilha && window.CardapioPlanilha.configurada()) {
+      guardarPedido(pedidoAtual);
+    }
+
     setTimeout(function () {
       carrinho = [];
       cliente = {};
+      pedidoAtual = '';
       salvarCarrinho();
       fecharModal();
       render();
@@ -695,11 +1120,17 @@
     var itens = carrinho.map(function (linha) {
       var achado = acharItem(linha.id);
       if (!achado) return null;
+
+      /* As opcoes entram junto da observacao do item, para a cozinha
+         ver tudo numa celula so. */
+      var rotulo = rotuloOpcoes(linha);
+      var observacao = [rotulo, linha.obs || ''].filter(Boolean).join(' | ');
+
       return {
         nome: achado.item.nome,
         quantidade: linha.qtd,
-        precoUnitario: achado.item.preco,
-        observacao: linha.obs || ''
+        precoUnitario: precoUnitarioLinha(linha),
+        observacao: observacao
       };
     }).filter(Boolean);
 
@@ -708,10 +1139,11 @@
     P.enviarPedido({
       data: agora.toLocaleDateString('pt-BR'),
       hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
-      pedido: numeroPedido(),
+      pedido: pedidoAtual || numeroPedido(),
       cliente: cliente.nome || '',
       tipo: cliente.tipo || 'entrega',
       endereco: cliente.endereco || '',
+      bairro: cliente.bairro || '',
       pagamento: cliente.pagamento || '',
       observacoes: cliente.obs || '',
       itens: itens,
@@ -783,31 +1215,57 @@
       if (ev.target.closest('[data-voltar-carrinho]')) { renderCarrinho(); return; }
       if (ev.target.closest('[data-enviar]')) { enviarWhatsApp(); return; }
 
+      /* modal de opcoes do item */
+      var editar = ev.target.closest('[data-editar-opcoes]');
+      if (editar) { editarOpcoesLinha(Number(editar.getAttribute('data-editar-opcoes'))); return; }
+      if (ev.target.closest('[data-op-confirmar]')) { confirmarOpcoes(); return; }
+      if (ev.target.closest('[data-op-inc]')) { mudarQtdOpcoes(1); return; }
+      if (ev.target.closest('[data-op-dec]')) { mudarQtdOpcoes(-1); return; }
+
       var inc = ev.target.closest('[data-inc]');
-      if (inc) { alterarQtd(inc.getAttribute('data-inc'), 1); return; }
+      if (inc) {
+        if (inc.hasAttribute('data-linha')) alterarLinha(Number(inc.getAttribute('data-linha')), 1);
+        else alterarQtd(inc.getAttribute('data-inc'), 1);
+        return;
+      }
       var dec = ev.target.closest('[data-dec]');
-      if (dec) { alterarQtd(dec.getAttribute('data-dec'), -1); return; }
+      if (dec) {
+        if (dec.hasAttribute('data-linha')) alterarLinha(Number(dec.getAttribute('data-linha')), -1);
+        else alterarQtd(dec.getAttribute('data-dec'), -1);
+        return;
+      }
     });
 
-    /* observações por item */
+    /* observações por linha do carrinho */
     el.modalCorpo.addEventListener('input', function (ev) {
-      var id = ev.target.getAttribute && ev.target.getAttribute('data-obs');
-      if (!id) return;
-      carrinho.forEach(function (l) { if (l.id === id) l.obs = ev.target.value; });
+      var indice = ev.target.getAttribute && ev.target.getAttribute('data-obs-linha');
+      if (indice === null || indice === undefined || indice === '') return;
+
+      var linha = carrinho[Number(indice)];
+      if (!linha) return;
+      linha.obs = ev.target.value;
       salvarCarrinho();
+    });
+
+    /* escolha de opcao (radio/checkbox) */
+    el.modalCorpo.addEventListener('change', function (ev) {
+      var alvo = ev.target;
+      if (!alvo.hasAttribute || !alvo.hasAttribute('data-op-escolha')) return;
+      aplicarEscolhaOpcao(alvo);
     });
 
     /* preview no checkout */
     el.modalCorpo.addEventListener('input', function (ev) {
       if (ev.target.id === 'coNome' || ev.target.id === 'coEndereco' ||
-          ev.target.id === 'coPagamento' || ev.target.id === 'coObs' ||
-          ev.target.name === 'coTipo') {
+          ev.target.id === 'coBairro' || ev.target.id === 'coPagamento' ||
+          ev.target.id === 'coObs' || ev.target.name === 'coTipo') {
         coletarCliente();
         atualizarPrevia();
       }
     });
 
-    /* mostra/esconde endereço conforme entrega ou retirada */
+    /* mostra/esconde endereço conforme entrega ou retirada; a troca de
+       bairro muda a taxa e por isso atualiza também o botão do carrinho */
     el.modalCorpo.addEventListener('change', function (ev) {
       if (ev.target.name === 'coTipo') {
         var box = el.modalCorpo.querySelector('#coEnderecoBox');
@@ -815,6 +1273,10 @@
         coletarCliente();
         atualizarPrevia();
         renderBotaoCarrinho(); /* retirada tira a taxa de entrega */
+      } else if (ev.target.id === 'coBairro') {
+        coletarCliente();
+        atualizarPrevia();
+        renderBotaoCarrinho(); /* a taxa do bairro muda o total */
       }
     });
 
@@ -834,6 +1296,11 @@
       Store.baixar('cardapio.json', Store.serializar());
       avisar('cardapio.json baixado 📄', 'ok');
     });
+
+    /* faixa "Acompanhar pedido" */
+    if (el.faixaPedidoFechar) {
+      el.faixaPedidoFechar.addEventListener('click', esconderFaixa);
+    }
 
     /* "/" foca a busca */
     document.addEventListener('keydown', function (ev) {
@@ -878,7 +1345,11 @@
       modalCorpo: $('#modalCorpo'),
       modalRodape: $('#modalRodape'),
       toasts: $('#toasts'),
-      rodapeNome: $('#rodapeNome')
+      rodapeNome: $('#rodapeNome'),
+      faixaPedido: $('#faixaPedido'),
+      faixaPedidoLink: $('#faixaPedidoLink'),
+      faixaPedidoNum: $('#faixaPedidoNum'),
+      faixaPedidoFechar: $('#faixaPedidoFechar')
     };
 
     /* Store.iniciar() monta o cardapio em memoria na hora
@@ -891,6 +1362,7 @@
     Store.assinar(render);
     podarCarrinho();
     render();
+    renderFaixaPedido();
 
     /* Depois da primeira pintura, para nao travar a abertura
        esperando o Google responder. */

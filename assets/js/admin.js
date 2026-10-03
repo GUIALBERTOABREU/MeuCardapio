@@ -108,8 +108,10 @@
     });
     el.tabItens.classList.toggle('oculto', nome !== 'itens');
     el.tabConfig.classList.toggle('oculto', nome !== 'config');
+    el.tabBairros.classList.toggle('oculto', nome !== 'bairros');
     el.tabJson.classList.toggle('oculto', nome !== 'json');
     if (nome === 'config') preencherConfig();
+    if (nome === 'bairros') renderBairros();
     if (nome === 'json') el.textareaJson.value = Store.serializar();
   }
 
@@ -178,9 +180,13 @@
       '<button type="button" class="btn btn-icone btn-contorno" data-destaque="' + esc(item.id) + '" ' +
         'title="' + (item.destaque ? 'Remover destaque' : 'Marcar como destaque') + '">' + (item.destaque ? '⭐' : '☆') + '</button>' +
       '<span class="item-admin-nome">' + esc(item.nome) +
-        (item.descricao ? '<small>' + esc(item.descricao) + '</small>' : '') + '</span>' +
+        (item.descricao ? '<small>' + esc(item.descricao) + '</small>' : '') +
+        (item.opcoes && item.opcoes.length
+          ? '<small class="item-admin-opcoes">' + item.opcoes.length + ' grupo(s) de opções</small>'
+          : '') + '</span>' +
       '<span class="item-admin-preco">' + moeda(item.preco) + '</span>' +
       '<div class="acoes">' +
+        '<button type="button" class="btn btn-icone btn-contorno" data-opcoes-item="' + esc(item.id) + '" title="Opções de escolha do item">⚙</button>' +
         '<button type="button" class="btn btn-icone btn-contorno" data-mover-item="' + esc(item.id) + '" data-dir="-1" title="Subir"' + (posicao === 0 ? ' disabled' : '') + '>↑</button>' +
         '<button type="button" class="btn btn-icone btn-contorno" data-mover-item="' + esc(item.id) + '" data-dir="1" title="Descer"' + (posicao === total - 1 ? ' disabled' : '') + '>↓</button>' +
         '<button type="button" class="btn btn-icone btn-contorno" data-editar-item="' + esc(item.id) + '" title="Editar">✎</button>' +
@@ -333,6 +339,127 @@
     });
   }
 
+  /* ---------- opcoes de item ----------
+     Cada item pode ter grupos de escolha (Tamanho, Adicionais,
+     Sabores). O dono edita num modal proprio, aberto pelo botao ⚙.
+     O estado fica em opcoesEditando enquanto o modal esta aberto. */
+  var opcoesEditando = null; /* { id, nome, grupos } */
+
+  function editarOpcoesItem(id) {
+    var achado = acharItem(id);
+    if (!achado) return;
+
+    opcoesEditando = {
+      id: id,
+      nome: achado.item.nome,
+      grupos: JSON.parse(JSON.stringify(achado.item.opcoes || []))
+    };
+    renderOpcoesAdmin();
+  }
+
+  /* Le o formulario inteiro para o estado. Chamado antes de qualquer
+     mudanca estrutural (add/remover), senao o que foi digitado se
+     perderia ao redesenhar. */
+  function coletarOpcoesForm() {
+    if (!opcoesEditando) return;
+
+    var grupos = [];
+    var caixas = el.modalCorpo.querySelectorAll('[data-grupo-box]');
+    Array.prototype.forEach.call(caixas, function (caixa) {
+      var g = {
+        grupo: caixa.querySelector('[data-g-nome]').value.trim(),
+        tipo: caixa.querySelector('[data-g-tipo]').value,
+        obrigatorio: caixa.querySelector('[data-g-obrig]').checked,
+        itens: []
+      };
+
+      var linhas = caixa.querySelectorAll('[data-o-linha]');
+      Array.prototype.forEach.call(linhas, function (linha) {
+        var nome = linha.querySelector('[data-o-nome]').value.trim();
+        var preco = lerPreco(linha.querySelector('[data-o-preco]').value);
+        if (nome) g.itens.push({ nome: nome, preco: isFinite(preco) ? preco : 0 });
+      });
+
+      grupos.push(g);
+    });
+
+    opcoesEditando.grupos = grupos;
+  }
+
+  function renderOpcoesAdmin() {
+    var grupos = opcoesEditando.grupos || [];
+    var corpo = '<div class="empilha">';
+
+    if (!grupos.length) {
+      corpo += '<p class="dica">Sem opções. Adicione um grupo (ex.: Tamanho, Adicionais, Sabores).</p>';
+    }
+
+    grupos.forEach(function (g, i) {
+      corpo += '<fieldset class="grupo-admin" data-grupo-box>' +
+        '<legend>Grupo ' + (i + 1) + '</legend>' +
+        '<div class="campo"><label>Nome do grupo</label>' +
+        '<input type="text" data-g-nome value="' + esc(g.grupo) + '" maxlength="40" placeholder="Ex.: Tamanho"></div>' +
+        '<div class="campo"><label>Tipo de escolha</label>' +
+        '<select data-g-tipo>' +
+          '<option value="unico"' + (g.tipo !== 'multiplo' ? ' selected' : '') + '>Só uma opção (escolha única)</option>' +
+          '<option value="multiplo"' + (g.tipo === 'multiplo' ? ' selected' : '') + '>Várias opções (adicionais)</option>' +
+        '</select></div>' +
+        '<label class="chave"><span>Escolha obrigatória</span>' +
+        '<input type="checkbox" data-g-obrig' + (g.obrigatorio ? ' checked' : '') + '></label>' +
+        '<div class="opcoes-admin-lista">';
+
+      (g.itens || []).forEach(function (o, j) {
+        corpo += '<div class="opcao-admin" data-o-linha>' +
+          '<input type="text" data-o-nome value="' + esc(o.nome) + '" maxlength="40" placeholder="Opção (ex.: Grande)">' +
+          '<input type="text" data-o-preco inputmode="decimal" value="' + precoParaCampo(o.preco) + '" placeholder="0,00">' +
+          '<button type="button" class="btn btn-icone btn-perigo" data-remover-opcao="' + i + ',' + j + '" title="Remover opção">🗑</button>' +
+        '</div>';
+      });
+
+      corpo += '</div>' +
+        '<div class="acoes-grupo">' +
+          '<button type="button" class="btn btn-sm btn-contorno" data-add-opcao="' + i + '">+ Opção</button>' +
+          '<button type="button" class="btn btn-sm btn-perigo" data-remover-grupo="' + i + '">Remover grupo</button>' +
+        '</div>' +
+      '</fieldset>';
+    });
+
+    corpo += '</div>';
+
+    abrirModal('Opções · ' + opcoesEditando.nome, corpo,
+      '<button type="button" class="btn btn-contorno btn-bloco" data-add-grupo>+ Grupo</button>' +
+      '<button type="button" class="btn btn-primario btn-bloco" data-salvar-opcoes>Salvar opções</button>' +
+      '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Cancelar</button>');
+  }
+
+  function salvarOpcoes() {
+    coletarOpcoesForm();
+
+    var limpos = (opcoesEditando.grupos || []).map(function (g) {
+      return {
+        grupo: g.grupo,
+        tipo: g.tipo === 'multiplo' ? 'multiplo' : 'unico',
+        obrigatorio: !!g.obrigatorio,
+        itens: (g.itens || []).filter(function (o) { return o.nome; })
+      };
+    }).filter(function (g) { return g.grupo && g.itens.length; });
+
+    var idAlvo = opcoesEditando.id;
+    Store.alterar(function (d) {
+      d.categorias.forEach(function (c) {
+        (c.itens || []).forEach(function (i) {
+          if (i.id !== idAlvo) return;
+          if (limpos.length) i.opcoes = limpos;
+          else delete i.opcoes;
+        });
+      });
+    });
+
+    opcoesEditando = null;
+    fecharModal();
+    avisar('Opções atualizadas ✅', 'ok');
+  }
+
   /* ---------- acoes de categoria ---------- */
   function novaCategoria() {
     abrirModal('Nova categoria', '' +
@@ -403,6 +530,136 @@
   }
 
   /* =========================================================
+     Aba: bairros e taxas
+     ========================================================= */
+  function renderBairros() {
+    var lista = Store.dados().bairros || [];
+
+    if (!lista.length) {
+      el.listaBairros.innerHTML =
+        '<div class="vazio"><span class="vazio-icone">🛵</span>' +
+        '<p>Nenhum bairro cadastrado.</p>' +
+        '<p class="dica">Sem bairros, o checkout usa a taxa única de entrega das Configurações.</p>' +
+        '<button type="button" class="btn btn-primario btn-sm" data-novo-bairro>+ Adicionar primeiro bairro</button></div>';
+      return;
+    }
+
+    el.listaBairros.innerHTML = lista.map(function (b, i) {
+      return '' +
+      '<div class="bairro-linha' + (b.ativo === false ? ' inativo' : '') + '">' +
+        '<div class="bairro-info">' +
+          '<b>' + esc(b.nome || '(sem nome)') + '</b>' +
+          '<span>' + moeda(b.taxa) + (b.tempo ? ' · ' + esc(b.tempo) : '') +
+            (b.ativo === false ? ' · inativo' : '') + '</span>' +
+        '</div>' +
+        '<div class="acoes">' +
+          '<button type="button" class="btn btn-icone btn-contorno" data-mover-bairro="' + esc(b.id) + '" data-dir="-1" title="Subir" ' + (i === 0 ? 'disabled' : '') + '>↑</button>' +
+          '<button type="button" class="btn btn-icone btn-contorno" data-mover-bairro="' + esc(b.id) + '" data-dir="1" title="Descer" ' + (i === lista.length - 1 ? 'disabled' : '') + '>↓</button>' +
+          '<button type="button" class="btn btn-sm btn-contorno" data-editar-bairro="' + esc(b.id) + '">Editar</button>' +
+          '<button type="button" class="btn btn-icone btn-perigo" data-excluir-bairro="' + esc(b.id) + '" title="Excluir bairro">🗑</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  /* Formulario compartilhado entre novo e editar bairro. */
+  function formularioBairro(b, idBotao, rotuloBotao, atributo) {
+    return abrirModal(b ? 'Editar bairro' : 'Novo bairro', '' +
+      '<div class="empilha">' +
+        '<div class="campo"><label for="mBairro">Bairro *</label>' +
+        '<input type="text" id="mBairro" value="' + esc(b ? b.nome : '') + '" placeholder="Ex.: Centro" maxlength="60"></div>' +
+        '<div class="campo"><label for="mTaxa">Taxa de entrega (' + (Store.dados().config.simboloMoeda || 'R$') + ')</label>' +
+        '<input type="text" id="mTaxa" inputmode="decimal" value="' + (b ? precoParaCampo(b.taxa) : '') + '" placeholder="0,00"></div>' +
+        '<div class="campo"><label for="mTempo">Tempo de entrega</label>' +
+        '<input type="text" id="mTempo" value="' + esc(b ? (b.tempo || '') : '') + '" placeholder="30–40 min" maxlength="30"></div>' +
+        '<label class="chave"><span>Ativo</span><input type="checkbox" id="mAtivo"' + (b && b.ativo === false ? '' : ' checked') + '></label>' +
+      '</div>', '' +
+      '<button type="button" class="btn btn-primario btn-bloco" ' + atributo + '="' + esc(idBotao) + '">' + rotuloBotao + '</button>' +
+      '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Cancelar</button>');
+  }
+
+  function novoBairro() {
+    formularioBairro(null, '', 'Adicionar bairro', 'data-criar-bairro');
+    setTimeout(function () { el.modalCorpo.querySelector('#mBairro').focus(); }, 80);
+  }
+
+  function editarBairro(id) {
+    var b = (Store.dados().bairros || []).filter(function (x) { return x.id === id; })[0];
+    if (!b) return;
+    formularioBairro(b, b.id, 'Salvar alterações', 'data-salvar-bairro');
+  }
+
+  /* Le nome/taxa/tempo/ativo do formulario. Devolve null se o nome
+     estiver vazio (e avisa). */
+  function lerBairroDoModal() {
+    var nome = el.modalCorpo.querySelector('#mBairro').value.trim();
+    if (!nome) { avisar('O nome do bairro é obrigatório.', 'erro'); return null; }
+    var taxa = lerPreco(el.modalCorpo.querySelector('#mTaxa').value);
+    if (!isFinite(taxa)) taxa = 0;
+    return {
+      nome: nome,
+      taxa: Math.round(taxa * 100) / 100,
+      tempo: el.modalCorpo.querySelector('#mTempo').value.trim(),
+      ativo: el.modalCorpo.querySelector('#mAtivo').checked
+    };
+  }
+
+  function criarBairro() {
+    var novo = lerBairroDoModal();
+    if (!novo) return;
+
+    Store.alterar(function (d) {
+      d.bairros = d.bairros || [];
+      novo.id = Store.slug(novo.nome);
+      d.bairros.push(novo);
+    });
+
+    fecharModal();
+    avisar('Bairro adicionado ✅', 'ok');
+  }
+
+  function salvarBairro(id) {
+    var dados = lerBairroDoModal();
+    if (!dados) return;
+
+    Store.alterar(function (d) {
+      (d.bairros || []).forEach(function (b) {
+        if (b.id !== id) return;
+        b.nome = dados.nome;
+        b.taxa = dados.taxa;
+        b.tempo = dados.tempo;
+        b.ativo = dados.ativo;
+      });
+    });
+
+    fecharModal();
+    avisar('Bairro atualizado ✅', 'ok');
+  }
+
+  function excluirBairro(id) {
+    var b = (Store.dados().bairros || []).filter(function (x) { return x.id === id; })[0];
+    if (!b) return;
+    if (!confirm('Excluir o bairro "' + b.nome + '"? Essa ação não pode ser desfeita.')) return;
+
+    Store.alterar(function (d) {
+      d.bairros = (d.bairros || []).filter(function (x) { return x.id !== id; });
+    });
+    avisar('Bairro excluído');
+  }
+
+  function moverBairro(id, dir) {
+    Store.alterar(function (d) {
+      var lista = d.bairros || [];
+      var i = lista.findIndex(function (x) { return x.id === id; });
+      var j = i + Number(dir);
+      if (i < 0 || j < 0 || j >= lista.length) return;
+      var tmp = lista[i];
+      lista[i] = lista[j];
+      lista[j] = tmp;
+    });
+  }
+
+  /* =========================================================
      Aba: configuracoes
      ========================================================= */
   function preencherConfig() {
@@ -432,6 +689,11 @@
     el.cfgAberto.checked = c.aberto;
     el.cfgPedirNome.checked = c.pedirNome !== false;
     el.cfgPedirEntrega.checked = c.pedirEntrega !== false;
+    el.cfgEndereco.value = c.enderecoLoja || '';
+    el.cfgInstagram.value = c.instagram || '';
+    el.cfgPagamento.value = c.formasPagamento || '';
+    el.cfgTempoEntrega.value = c.tempoEntrega || '';
+    el.cfgTempoRetirada.value = c.tempoRetirada || '';
     el.cfgPlanilhaUrl.value = c.planilhaUrl || '';
     el.cfgPlanilhaToken.value = c.planilhaToken || '';
   }
@@ -454,6 +716,11 @@
       cfgAberto: ['aberto', 'bool'],
       cfgPedirNome: ['pedirNome', 'bool'],
       cfgPedirEntrega: ['pedirEntrega', 'bool'],
+      cfgEndereco: ['enderecoLoja', 'texto'],
+      cfgInstagram: ['instagram', 'texto'],
+      cfgPagamento: ['formasPagamento', 'texto'],
+      cfgTempoEntrega: ['tempoEntrega', 'texto'],
+      cfgTempoRetirada: ['tempoRetirada', 'texto'],
       cfgPlanilhaUrl: ['planilhaUrl', 'planilha'],
       cfgPlanilhaToken: ['planilhaToken', 'texto']
     };
@@ -792,6 +1059,7 @@
   function fecharModal() {
     el.overlay.classList.add('oculto');
     document.body.classList.remove('travado');
+    opcoesEditando = null;
   }
 
   /* =========================================================
@@ -819,6 +1087,23 @@
     });
 
     el.btnNovaCategoria.addEventListener('click', novaCategoria);
+
+    el.btnNovoBairro.addEventListener('click', novoBairro);
+
+    el.listaBairros.addEventListener('click', function (ev) {
+      var t = ev.target;
+
+      if (t.closest('[data-novo-bairro]')) { novoBairro(); return; }
+
+      var mover = t.closest('[data-mover-bairro]');
+      if (mover) { moverBairro(mover.getAttribute('data-mover-bairro'), mover.getAttribute('data-dir')); return; }
+
+      var ed = t.closest('[data-editar-bairro]');
+      if (ed) { editarBairro(ed.getAttribute('data-editar-bairro')); return; }
+
+      var exc = t.closest('[data-excluir-bairro]');
+      if (exc) { excluirBairro(exc.getAttribute('data-excluir-bairro')); return; }
+    });
 
     el.listaCategorias.addEventListener('click', function (ev) {
       var t = ev.target;
@@ -861,6 +1146,9 @@
       var mover = t.closest('[data-mover-item]');
       if (mover) { moverItem(mover.getAttribute('data-mover-item'), mover.getAttribute('data-dir')); return; }
 
+      var edOp = t.closest('[data-opcoes-item]');
+      if (edOp) { editarOpcoesItem(edOp.getAttribute('data-opcoes-item')); return; }
+
       var ed = t.closest('[data-editar-item]');
       if (ed) { editarItem(ed.getAttribute('data-editar-item')); return; }
 
@@ -890,13 +1178,59 @@
       if (criar) { criarItem(criar.getAttribute('data-criar-item')); return; }
 
       if (t.closest('[data-criar-cat]')) { criarCategoria(); return; }
+
+      if (t.closest('[data-criar-bairro]')) { criarBairro(); return; }
+
+      var salvarB = t.closest('[data-salvar-bairro]');
+      if (salvarB) { salvarBairro(salvarB.getAttribute('data-salvar-bairro')); return; }
+
+      if (t.closest('[data-add-grupo]')) {
+        coletarOpcoesForm();
+        opcoesEditando.grupos.push({ grupo: '', tipo: 'unico', obrigatorio: false, itens: [{ nome: '', preco: 0 }] });
+        renderOpcoesAdmin();
+        return;
+      }
+
+      if (t.closest('[data-salvar-opcoes]')) { salvarOpcoes(); return; }
+    });
+
+    /* acoes estruturais do editor de opcoes (corpo do modal) */
+    el.modalCorpo.addEventListener('click', function (ev) {
+      if (!opcoesEditando) return;
+      var t = ev.target;
+
+      var addO = t.closest('[data-add-opcao]');
+      if (addO) {
+        var gi = Number(addO.getAttribute('data-add-opcao'));
+        coletarOpcoesForm();
+        opcoesEditando.grupos[gi].itens.push({ nome: '', preco: 0 });
+        renderOpcoesAdmin();
+        return;
+      }
+
+      var remO = t.closest('[data-remover-opcao]');
+      if (remO) {
+        var par = remO.getAttribute('data-remover-opcao').split(',');
+        coletarOpcoesForm();
+        opcoesEditando.grupos[Number(par[0])].itens.splice(Number(par[1]), 1);
+        renderOpcoesAdmin();
+        return;
+      }
+
+      var remG = t.closest('[data-remover-grupo]');
+      if (remG) {
+        coletarOpcoesForm();
+        opcoesEditando.grupos.splice(Number(remG.getAttribute('data-remover-grupo')), 1);
+        renderOpcoesAdmin();
+        return;
+      }
     });
 
     /* enter no nome do item cria/salva */
     el.modalCorpo.addEventListener('keydown', function (ev) {
       if (ev.key !== 'Enter') return;
-      if (ev.target.id !== 'mNome' && ev.target.id !== 'mPreco') return;
-      var acao = el.modalRodape.querySelector('[data-salvar-item], [data-criar-item], [data-criar-cat]');
+      if (ev.target.id !== 'mNome' && ev.target.id !== 'mPreco' && ev.target.id !== 'mBairro') return;
+      var acao = el.modalRodape.querySelector('[data-salvar-item], [data-criar-item], [data-criar-cat], [data-criar-bairro], [data-salvar-bairro]');
       if (acao) acao.click();
     });
 
@@ -940,6 +1274,7 @@
   function renderTudo() {
     renderListas();
     if (abaAtual === 'config') preencherConfig();
+    if (abaAtual === 'bairros') renderBairros();
     if (abaAtual === 'json') el.textareaJson.value = Store.serializar();
     renderAvisoPublicar();
   }
@@ -1017,6 +1352,7 @@
       modalFechar: $('#modalFechar'),
       tabItens: $('#tabItens'),
       tabConfig: $('#tabConfig'),
+      tabBairros: $('#tabBairros'),
       tabJson: $('#tabJson'),
       textareaJson: $('#textareaJson'),
       resultadoJson: $('#resultadoJson'),
@@ -1040,7 +1376,14 @@
       cfgAberto: $('#cfgAberto'),
       cfgPedirNome: $('#cfgPedirNome'),
       cfgPedirEntrega: $('#cfgPedirEntrega'),
+      cfgEndereco: $('#cfgEndereco'),
+      cfgInstagram: $('#cfgInstagram'),
+      cfgPagamento: $('#cfgPagamento'),
+      cfgTempoEntrega: $('#cfgTempoEntrega'),
+      cfgTempoRetirada: $('#cfgTempoRetirada'),
       cfgSenha: $('#cfgSenha'),
+      listaBairros: $('#listaBairros'),
+      btnNovoBairro: $('#btnNovoBairro'),
       cfgPlanilhaUrl: $('#cfgPlanilhaUrl'),
       cfgPlanilhaToken: $('#cfgPlanilhaToken'),
       btnEnviarCardapio: $('#btnEnviarCardapio'),
