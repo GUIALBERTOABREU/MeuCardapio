@@ -246,11 +246,35 @@ do primeiro uso autorizado. Sem ele, o passo 5 não funciona.
 > **Atualizou o script?** Volte ao passo 5 e crie uma implantação nova. Alterar o
 > código não muda a versão que está no ar — é o erro mais comum aqui.
 
-### 2. Colar a URL no painel
+### 2. Onde cada lado da planilha mora
 
-Em **Configurações → Planilha Google Sheets**, cole a URL e clique em
+A URL vai em **dois lugares**, porque quem publica (você, no painel) e quem lê (o
+cliente, no site) não compartilham memória — o navegador do cliente nunca viu o que
+você digitou.
+
+**No painel** — em *Configurações → Planilha Google Sheets*, cole a URL e clique em
 **Testar conexão**. Se aparecer uma linha na aba `Pedidos` com `TESTE`, está
-funcionando.
+funcionando. Isso vale só para a sua máquina: fica guardado no navegador de quem
+administra.
+
+**No site** — abra `assets/js/planilha-site.js` e cole a mesma URL:
+
+```js
+window.CardapioSite = {
+  planilhaUrl: 'https://script.google.com/macros/s/SEU_ID/exec',
+  planilhaToken: 'SEU_TOKEN'
+};
+```
+
+Esse arquivo é lido por qualquer pessoa que abrir o código da página, e isso é
+proposital: por essa URL o script só devolve o cardápio e os dados da loja, que já
+são públicos. Os pedidos dos clientes não saem por ela. Quem **escreve** na planilha
+continua precisando do token, e esse fica guardado só no navegador de quem
+administra.
+
+> **Sem o passo do `planilha-site.js` o cliente nunca vê a planilha.** O painel
+> mostra um aviso vermelho na aba *Configurações* dizendo isso, com a URL que está
+> configurada aqui para você copiar. Não ignore esse aviso.
 
 Depois clique em **⬆ Enviar cardápio agora** uma vez. Isso cria a aba `Cardápio`
 com as 9 colunas e a aba `Config` com os dados da loja. Sem essa primeira
@@ -328,8 +352,48 @@ Detalhes que importam:
   para não sobrar item fantasma.
 - Preço pode vir como número, `18,90` ou `R$ 1.234,56`; sim/não pode vir escrito à
   mão. Os dois lados convertem do mesmo jeito.
-- Link de imagem só entra se for `http://` ou `https://`, sem espaço, aspas ou
-  barra invertida. `javascript:` e caminho relativo são descartados.
+- Link de imagem só entra se for `http://` ou `https://`, ou um caminho para a pasta
+  `img/` do site (ver abaixo). São descartados `javascript:`, `data:`, fórmulas
+  começando com `=`, âncora `#` e quem sai da pasta com `..`.
+
+### Imagem em pasta local (`img/`)
+
+Se você tem as fotos no computador, não precisa hospedar em lugar nenhum. Crie uma
+pasta `img/` **do lado do `index.html`** e jogue as fotos lá:
+
+```
+cardapio/
+  index.html
+  img/
+    FrangoaPassarinho.jfif
+    X-Burguer.png
+```
+
+Na coluna *Link da imagem* da planilha, ponha só o caminho, sem `http`:
+
+```
+img/FrangoaPassarinho.jfif
+```
+
+Com `./` na frente (`./img/foto.png`) funciona igual. O `img/` é relativo à página,
+então a mesma pasta serve para o `index.html` e para o `admin.html`.
+
+Três coisas para saber:
+
+- **Servido por `http://` funciona. Abrindo o arquivo com dois cliques (`file://`)
+  não** — o navegador bloqueia por segurança. E a planilha, de quebra, também não
+  funciona em `file://`. Se você usa pasta local, publique o site.
+- **Espaço e acento no nome do arquivo podem ficar.** `img/Suco Natural 400ml.jpg`
+  e `img/Água Mineral 500ml.jpg` carregam: o navegador converte para `%20` sozinho.
+  Só não use aspas, `<`, `>` ou barra invertida no nome.
+  (Para URL colada de fora, o espaço no meio **é** recusado — ali o link quebrado é
+  sempre erro de cópia, não nome de arquivo.)
+- Ao publicar o site de novo, **suba a pasta `img/` junto**. Se ela não for, os
+  itens voltam a mostrar o emoji.
+
+> **Peso das fotos:** a pasta `img/` completa passa de 4 MB, e só o `Isca de Peixe.jpg`
+> tem 1,5 MB. No 4G isso é a diferença entre o cardápio abrir na hora e ficar
+> girando. Baixe as fotos para uns 200–400 KB cada antes de publicar.
 
 ### Quando a imagem não aparece
 
@@ -460,20 +524,23 @@ cardapio/
 ├── admin.html            painel do dono
 ├── cardapio.json         exemplo embutido / backup — a página não o busca mais
 ├── planilha.gs           script do Google Sheets (cole no Google, não no site)
+├── img/                  fotos dos itens (opcional — suba junto ao publicar)
 └── assets/
     ├── css/style.css     todo o estilo, com variáveis de cor
     └── js/
+        ├── planilha-site.js  URL da planilha que o CLIENTE lê
         ├── store.js      dados, validação, salvar/carregar, senha
         ├── planilha.js   envio de pedidos e cardápio para o Google Sheets
         ├── app.js        cardápio, busca, carrinho, mensagem do WhatsApp
         └── admin.js      painel: itens, categorias, config, planilha, JSON
 ```
 
-`store.js` precisa vir antes dos outros: é ele que guarda os dados. `planilha.js` vem
-entre `store.js` e `app.js`/`admin.js` porque usa `Store.dados()`. Os scripts são
-comuns (sem `type="module"`) justamente para o cardápio funcionar aberto do `file://`,
-onde módulos seriam bloqueados pelo navegador. Não há `await`/`async` pelo mesmo
-motivo: WebView antiga de Android não reconhece.
+`planilha-site.js` vem antes de `store.js` porque é ele que diz ao `planilha.js` onde
+está a planilha. `store.js` precisa vir antes de `planilha.js`, que usa
+`Store.dados()`. Os scripts são comuns (sem `type="module"`) justamente para o
+cardápio funcionar aberto do `file://`, onde módulos seriam bloqueados pelo
+navegador. Não há `await`/`async` pelo mesmo motivo: WebView antiga de Android não
+reconhece.
 
 O cardápio que o cliente vê é montado em três tempos: `store.js` monta na hora
 (com o que o navegador tinha guardado), `app.js` pinta, e só então `planilha.js`
@@ -484,8 +551,15 @@ esperando o Google.
 
 1. Troque o WhatsApp do exemplo pelo número real
 2. Troque a senha do painel
-3. Publique o `planilha.gs` no Google, cole a URL em Configurações e clique uma vez
-   em **Enviar cardápio agora** — é isso que faz o cardápio do cliente vir da planilha
-4. **Publique o site em `http://` ou `https://`.** Em `file://` nem a leitura nem a
-   escrita da planilha funcionam
-5. Abra o link no celular e faça um pedido de teste de ponta a ponta
+3. Publique o `planilha.gs` no Google e **crie uma implantação nova** (o `doGet` com
+   JSONP e a aba `Config` são do script novo; a implantação antiga não os tem)
+4. Cole a URL em **Configurações** do painel e clique uma vez em **Enviar cardápio
+   agora** — é isso que cria as abas `Cardápio` e `Config`
+5. Cole a **mesma URL** em `assets/js/planilha-site.js` e **publique o site de novo**.
+   Sem isso o cliente continua vendo o exemplo embutido
+6. Se usar fotos locais, suba a pasta `img/` junto com o site
+7. **Publique o site em `http://` ou `https://`.** Em `file://` nem a leitura nem a
+   escrita da planilha funcionam, nem as imagens da pasta `img/`
+8. Abra o link no celular e faça um pedido de teste de ponta a ponta
+9. Confira que o cardápio do cliente mostra o nome da loja que está na planilha — se
+   mostrar o exemplo, o passo 5 ficou para trás

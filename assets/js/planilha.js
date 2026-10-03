@@ -177,14 +177,17 @@
   function linkDeImagem(valor) {
     var s = String(valor === null || valor === undefined ? '' : valor).trim();
     if (!s) return '';
-    /* Aceita URL absoluta http(s) ou caminho relativo (pasta local)
-       ao lado do index.html, como img/arquivo.jpg */
-    if (/^https?:\/\//i.test(s)) return s;
-    if (/^\/\//.test(s)) return 'https:' + s;
     if (s.indexOf('data:') === 0 || s.indexOf('javascript:') === 0 || s.indexOf('=') === 0) return '';
     if (s.indexOf('#') === 0 || s.indexOf('..') === 0) return '';
-    if (/[\s"'\\<>]/.test(s)) return '';
-    /* caminho relativo: remove ./ se tiver e devolve como esta */
+
+    /* URL colada a mao: espaco no meio = link quebrado. */
+    if (/^https?:\/\//i.test(s)) return /^[^\s"'\\<>]+$/.test(s) ? s : '';
+    if (/^\/\//.test(s)) return /^[^\s"'\\<>]+$/.test(s.slice(2)) ? 'https:' + s : '';
+
+    /* Caminho para a pasta img/ do site: espaco e acento no nome do
+       arquivo valem, porque o navegador codifica sozinho. */
+    if (/["<>\\\n\r]/.test(s)) return '';
+    /* remove ./ se tiver e devolve como esta */
     s = s.replace(/^\.\//, '');
     return s;
   }
@@ -380,7 +383,9 @@
      Numeros e booleanos sao gravados com tipo de verdade, para o
      dono poder recalcular a aba sem brigar com texto. */
   function tabelaConfig() {
-    var c = cfg();
+    /* A config inteira do store — nao a cfg() de planilha, que so
+       devolve URL e token. Aqui vao os dados da loja. */
+    var c = (window.CardapioStore && window.CardapioStore.dados().config) || {};
     var marca = dataHora();
 
     var linhas = CAMPOS_CONFIG.map(function (chave) {

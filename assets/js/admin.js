@@ -409,11 +409,15 @@
     var c = Store.dados().config;
     var P = window.CardapioPlanilha;
 
-    /* Reavalia o aviso do planilha-site.js: o dono pode ter acabado de
-       colar a URL, e o aviso precisa sumir assim que ele fizer isso. */
+    /* Reavalia o aviso do planilha-site.js: ele só faz sentido quando o
+       painel tem uma planilha e o site ainda não. Se o dono acabou de
+       colar a URL no arquivo, o aviso some sozinho. */
     if (P && el.avisoSite) {
-      if (!P.configurada() || P.siteConfigurado()) el.avisoSite.classList.add('oculto');
-      else el.avisoSite.classList.remove('oculto');
+      var siteOk = P.configurada() && P.siteConfigurado();
+      el.avisoSite.classList.toggle('oculto', !!siteOk);
+
+      var bUrl = el.avisoSite.querySelector('[data-site-url]');
+      if (bUrl) bUrl.textContent = c.planilhaUrl || '(vazio)';
     }
 
     el.cfgNome.value = c.nome;

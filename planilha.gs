@@ -234,13 +234,20 @@ function precoDe(valor) {
 function linkDe(valor) {
   var s = String(valor === null || valor === undefined ? '' : valor).trim();
   if (!s) return '';
-  if (/^https?:\/\/[^\s"'\\<>]+$/i.test(s)) return s;
-  if (/^\/\//.test(s)) return 'https:' + s;
   if (s.indexOf('data:') === 0 || s.indexOf('javascript:') === 0 || s.indexOf('=') === 0) return '';
   if (s.indexOf('#') === 0 || s.indexOf('..') === 0) return '';
-  if (/[\s"'\\<>]/.test(s)) return '';
-  s = s.replace(/^\.\//, '');
-  return s;
+
+  /* URL colada a mao: um espaco no meio significa que o link esta
+     quebrado (cortado, copiado de PDF). */
+  if (/^https?:\/\//i.test(s)) return /^[^\s"'\\<>]+$/.test(s) ? s : '';
+  if (/^\/\//.test(s)) return /^[^\s"'\\<>]+$/.test(s.slice(2)) ? 'https:' + s : '';
+
+  /* Caminho para a pasta img/ do site. Aqui espaco e acento no nome
+     do arquivo sao permitidos: o navegador codifica (%20) sozinho e
+     a imagem carrega. O que nao passa e aspa, <, > e barra
+     invertida. */
+  if (/["<>\\\n\r]/.test(s)) return '';
+  return s.replace(/^\.\//, '');
 }
 
 /**
