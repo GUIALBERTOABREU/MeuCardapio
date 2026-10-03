@@ -365,45 +365,67 @@ pasta `img/` **do lado do `index.html`** e jogue as fotos lá:
 cardapio/
   index.html
   img/
-    FrangoaPassarinho.jfif
-    X-Burguer.png
+    frangoa-passarinho.jfif
+    x-burguer-duplo.jpg
 ```
 
 Na coluna *Link da imagem* da planilha, ponha só o caminho, sem `http`:
 
 ```
-img/FrangoaPassarinho.jfif
+img/frangoa-passarinho.jfif
 ```
 
-Com `./` na frente (`./img/foto.png`) funciona igual. O `img/` é relativo à página,
-então a mesma pasta serve para o `index.html` e para o `admin.html`.
+O `img/` é relativo à página, então a mesma pasta serve para o `index.html` e para
+o `admin.html`.
 
-Três coisas para saber:
+#### O nome do arquivo tem um padrão só
+
+**minúsculas, sem acento, hífen no lugar do espaço.** É por causa do GitHub Pages
+rodar em Linux, e Linux diferenciar `Suco Natural 400ml.jpg` de
+`suco-natural-400ml.jpg` — o Windows, onde você desenvolve, não diferencia e
+esconde o erro. Na sua máquina o link errado abre; no ar, dá 404 e o item volta a
+mostrar o emoji.
+
+Para não te fazer decorar isso, o cardápio **tenta sozinho** as variantes mais
+comuns quando o primeiro endereço falha:
+
+| Você digita | Ele tenta, nesta ordem |
+| --- | --- |
+| `img/X-Burguer.jpg` | como está → `img/x-burguer.jpg` |
+| `img/Agua Mineral.jpg` | como está → `img/agua mineral.jpg` |
+
+Isso resolve maiúscula e acento. **Espaço contra hífen não tem como adivinhar** —
+por isso a pasta já veio renomeada, e é só copiar o nome de lá.
+
+Para conferir o nome exato de um arquivo, abra `img/` no navegador: o GitHub Pages
+mostra a lista com os nomes reais.
+
+Outras coisas para saber:
 
 - **Servido por `http://` funciona. Abrindo o arquivo com dois cliques (`file://`)
   não** — o navegador bloqueia por segurança. E a planilha, de quebra, também não
   funciona em `file://`. Se você usa pasta local, publique o site.
-- **Espaço e acento no nome do arquivo podem ficar.** `img/Suco Natural 400ml.jpg`
-  e `img/Água Mineral 500ml.jpg` carregam: o navegador converte para `%20` sozinho.
-  Só não use aspas, `<`, `>` ou barra invertida no nome.
-  (Para URL colada de fora, o espaço no meio **é** recusado — ali o link quebrado é
-  sempre erro de cópia, não nome de arquivo.)
+- **Para URL colada de fora, o espaço no meio é recusado** — ali o link quebrado é
+  sempre erro de cópia, não nome de arquivo.
 - Ao publicar o site de novo, **suba a pasta `img/` junto**. Se ela não for, os
   itens voltam a mostrar o emoji.
 
-> **Peso das fotos:** a pasta `img/` completa passa de 4 MB, e só o `Isca de Peixe.jpg`
-> tem 1,5 MB. No 4G isso é a diferença entre o cardápio abrir na hora e ficar
-> girando. Baixe as fotos para uns 200–400 KB cada antes de publicar.
+> **Peso das fotos:** a pasta `img/` passa de 4 MB, e só a `isca-de-peixe.jpg` tem
+> 1,5 MB. No 4G isso é a diferença entre o cardápio abrir na hora e ficar girando.
+> Baixe as fotos para uns 200–400 KB cada antes de publicar.
 
 ### Quando a imagem não aparece
 
-Duas formas do mesmo endereço são tentadas, em ordem, antes de o cardápio desistir:
+Estas formas do mesmo endereço são tentadas, em ordem, antes de o cardápio desistir:
 
-1. **`http://` numa página `https://`.** O navegador bloqueia isso como
+1. **Maiúscula e acento no nome.** Como explicado acima, o cardápio refaz a tentativa
+   em minúsculas e sem acento. É o que salva o item quando o link da planilha não
+   bate com o nome do arquivo.
+2. **`http://` numa página `https://`.** O navegador bloqueia isso como
    *mixed content* e a imagem não carrega nunca, nem recarregando. O cardápio tenta
    o `https://` primeiro e guarda o `http://` de reserva para o servidor que só
    atende `http`.
-2. **Link do Google Drive.** O link que o Drive dá ("Compartilhar → Copiar link")
+3. **Link do Google Drive.** O link que o Drive dá ("Compartilhar → Copiar link")
    abre uma página de visualização em HTML, não a imagem. O cardápio reconhece e
    troca sozinho pelo endereço que entrega o arquivo:
    `https://drive.google.com/uc?export=view&id=ID`.

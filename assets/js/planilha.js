@@ -219,11 +219,28 @@
       if (u && saida.indexOf(u) < 0) saida.push(u);
     }
 
-    /* caminho relativo: nao precisa converter http->https nem Drive;
-       tenta direto (e pode incluir ./ opcionalmente) */
+    /* Caminho relativo (pasta img/ do site).
+
+       Alem do caminho como o dono digitou, tentamos variantes do
+       NOME do arquivo. GitHub Pages roda em Linux, onde o sistema de
+       arquivos diferencia maiuscula de minuscula e acento de nao
+       acento — o Windows, onde a gente develope, nao. Sem isso,
+       "img/X-Burguer.jpg" funciona na maquina e da 404 no ar, e o
+       dono fica sem ideia do motivo. */
     if (!/^https?:\/\//i.test(s) && !/^\/\//.test(s)) {
+      var pasta = s.slice(0, s.lastIndexOf('/') + 1);
+      var arquivo = s.slice(pasta.length);
+
+      var semAcento = arquivo.normalize
+        ? arquivo.normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        : arquivo;
+
       Push(s);
       Push('./' + s);
+      Push(pasta + semAcento);
+      Push(pasta + arquivo.toLowerCase());
+      Push(pasta + semAcento.toLowerCase());
+
       return saida;
     }
 
