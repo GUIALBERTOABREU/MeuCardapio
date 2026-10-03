@@ -35,7 +35,7 @@
  * alguém que achou a URL, não contra quem tem acesso ao arquivo.
  */
 
-var TOKEN = '';           // deixe vazio para não exigir token
+var TOKEN = 'GUIGA9805_LINDO';           // deixe vazio para não exigir token
 
 /* A aba do cardápio é a única que este arquivo precisa conocer pelo
    nome: as demais chegam nomeadas no corpo do POST (spec.nome), e a
