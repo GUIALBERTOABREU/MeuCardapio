@@ -596,6 +596,16 @@
       return;
     }
 
+    /* O painel e a unica pagina que pode escolher a URL por conta
+       propria: ele precisa testar contra uma planilha de ensaio ou
+       um servidor local sem mexer no planilha-site.js, que vai junto
+       com o site. O cardapio do cliente, ao contrario, segue sempre
+       o planilha-site.js — senao, como o painel roda na mesma
+       origem, a URL guardada aqui continuaria valendo depois de
+       uma implantacao nova e o dono testaria contra a versao velha
+       enquanto o visitante receberia o cardapio desatualizado. */
+    P.usarUrlDoPainel(true);
+
     function semUrl() {
       avisar('Cole a URL do Web App primeiro.', 'erro');
       el.cfgPlanilhaUrl.focus();

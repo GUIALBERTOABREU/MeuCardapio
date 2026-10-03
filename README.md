@@ -294,14 +294,19 @@ https://script.google.com/macros/s/SEU_ID/exec?callback=cardapioLer1&token=SEU_T
 
 Essa linha pode ser colada direto no campo **URL do Web App**. O `?callback=` e o
 `?token=` são removidos antes de qualquer chamada e montados de novo, então não
-sobra `??` nem token duplicado. (Na leitura o `callback` nem é enviado: o `fetch`
-comum não precisa dele.) Se você colar a URL com o token e deixar o campo **Token
-do script** vazio, o token é aproveitado de onde veio — mas **preencha os dois
-campos** se puder: deixar o token na URL e no campo é pedir para eles divergirem
-sem você perceber.
+sobra `??` nem token duplicado. (Na leitura do cardápio nem `callback` nem `token`
+são enviados — o `fetch` comum não precisa dos dois.) Se você colar a URL com o
+token e deixar o campo **Token do script** vazio, o token é aproveitado de onde
+veio — mas **preencha os dois campos** se puder: deixar o token na URL e no campo é
+pedir para eles divergirem sem você perceber.
 
 Só o `/exec` é obrigatório. `SEU_ID` e `SEU_TOKEN` são placeholders: troque pelo
 seu.
+
+**Cada implantação nova tem uma URL nova.** Depois de criar outra implantação, atualize
+os dois lugares — o campo **URL do Web App** do painel e o `planilhaUrl` do
+`planilha-site.js`. O painel usa o campo dele; o cliente usa o arquivo. Deixar um
+dos dois para trás faz um lado falar com a implantação antiga.
 
 ### O aviso de "não publicado"
 
@@ -523,16 +528,45 @@ aba que permite saber quanto saiu de cada item:
 =SOMASE(Itens!E:E;"X-Burguer";Itens!G:G)
 ```
 
-### Token (recomendado)
+### Token (recomendado) — protege a escrita, não a leitura
 
-Qualquer pessoa com a URL consegue ler e escrever na sua planilha. Para limitar,
-edite a linha `var TOKEN = ''` no script, coloque um valor difícil de adivinhar e
-repita o mesmo valor no campo **Token do script** do painel. Se os dois lados não
-baterem, o script recusa e anota `token inválido` na aba `Registro`.
+Sem token, qualquer pessoa com a URL consegue **gravar pedidos falsos** na sua
+planilha. Para impedir, edite a linha `var TOKEN = ''` no script, coloque um valor
+difícil de adivinhar e repita o mesmo valor no campo **Token do script** do painel.
+Se os dois lados não baterem, o script recusa e anota `bloqueado / token inválido`
+na aba `Registro`.
 
-Com a planilha virando fonte da verdade, o token é ainda mais importante: ele
-protege o cardápio do cliente, e não só os pedidos. Quem tem acesso ao arquivo do
-Google continua podendo ler e apagar a planilha.
+**A leitura do cardápio é de graça, e é de propósito.** O cardápio é público por
+natureza: quem abre o site já vê os itens, os preços e o número do WhatsApp na tela.
+Exigir token para ler não protege nada — só garante que o cliente visse o exemplo
+embutido. O `planilha-site.js`, que é público, ficaria com o token à mostra no
+código da página.
+
+Esse erro foi cometido de verdade aqui e o sintoma enganava: o dono configurou o
+token, criou a implantação nova e testou no navegador dele — funcionava, porque a
+implantação **antiga** (que ele ainda tinha em uso no próprio navegador) não pedia
+token. Todo visitante novo recebia `Token inválido` e via o exemplo. Por isso a
+regra é: **teste sempre em janela anônima**, que é o que o cliente vê.
+
+Depois de mudar o `TOKEN`, crie uma implantação nova (*Implantar → Gerenciar
+implantações → ✏️ → Versão: Nova versão*). Só salvar o código não muda nada: o
+Google continua servindo o texto antigo até a implantação mudar.
+
+Quem souber o token ainda pode ler e apagar a planilha, e quem tem acesso ao
+arquivo do Google continua com tudo. É proteção contra quem achou a URL, não contra
+quem tem a planilha.
+
+### Quem manda na URL da planilha
+
+O cardápio do cliente lê **sempre** a URL do `planilha-site.js`. O que estiver
+guardado no navegador não conta — e isso não é detalhe, é correção de defeito: o
+painel roda no mesmo site, no mesmo navegador e no mesmo `localStorage`, então a
+URL que o dono digita uma vez fica gravada ali para sempre. Numa implantação nova o
+próprio navegador dele continuaria lendo a implantação velha.
+
+O painel é a exceção declarada: ele pede ao `planilha.js` para usar a URL do
+`localStorage` dele, porque precisa testar contra uma planilha de ensaio ou um
+servidor local sem mexer no arquivo que vai junto com o site.
 
 ### Limites que valem saber
 
@@ -597,6 +631,14 @@ esperando o Google.
 6. Se usar fotos locais, suba a pasta `img/` junto com o site
 7. **Publique o site em `http://` ou `https://`.** Em `file://` nem a leitura nem a
    escrita da planilha funcionam, nem as imagens da pasta `img/`
-8. Abra o link no celular e faça um pedido de teste de ponta a ponta
-9. Confira que o cardápio do cliente mostra o nome da loja que está na planilha — se
-   mostrar o exemplo, o passo 5 ficou para trás
+8. Coloque o token: `var TOKEN` no script, o mesmo valor em **Token do script** do
+   painel, e uma implantação nova. A leitura do cardápio continua de graça — o token
+   protege a escrita
+9. Abra o link no celular e faça um pedido de teste de ponta a ponta
+10. **Teste em janela anônima.** O navegador de quem configurou guarda a URL antiga e
+    mascara problema de implantação — foi assim que um token novo passou por
+    funcionando para o dono e quebrava para todo mundo
+11. Confira que o cardápio do cliente mostra o nome da loja que está na planilha — se
+    mostrar o exemplo, o passo 5 ficou para trás. Colete a URL `/exec` e confirme que
+    ela responde `{"ok":true,"menu":[…`, e não `"mensagem":"… conectado"` nem
+    `{"ok":false,"erro":"Token inválido."}`

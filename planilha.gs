@@ -29,10 +29,13 @@
  * 6. Copie a URL /exec e cole no painel, em Configurações →
  *    Planilha Google Sheets.
  *
- * TOKEN é opcional. Preencha aqui e no painel para impedir que
- * qualquer pessoa com a URL escreva na sua planilha. Quem souber o
- * token ainda pode ler e apagar a planilha — é proteção contra
- * alguém que achou a URL, não contra quem tem acesso ao arquivo.
+ * TOKEN é opcional, e protege SÓ A ESCRITA (o POST). A leitura do
+ * cardápio é de graça e sempre foi: o cardápio é público, quem abre
+ * o site já vê os itens e o WhatsApp na tela. Preencha o TOKEN aqui e
+ * no painel para impedir que qualquer pessoa com a URL grave pedidos
+ * falsos na sua planilha. Quem souber o token ainda pode ler e apagar
+ * a planilha — é proteção contra alguém que achou a URL, não contra
+ * quem tem acesso ao arquivo.
  */
 
 var TOKEN = 'GUIGA9805_LINDO';           // deixe vazio para não exigir token
@@ -116,8 +119,17 @@ function doPost(e) {
  * depende do tipo da resposta, então não sofre com isso.
  *
  * O JSONP continua existindo como reserva. O preço dele é rodar como
- * código na origem do site, por isso validamos o nome do callback e
- * exigimos o mesmo TOKEN da escrita quando ele estiver configurado.
+ * código na origem do site, por isso validamos o nome do callback.
+ *
+ * A LEITURA NÃO EXIGE TOKEN — só a escrita. O cardápio é público por
+ * natureza: qualquer pessoa que abra o site já vê os itens, os preços
+ * e o número do WhatsApp na tela. Exigir token para ler não protege
+ * nada, e ainda quebra o cliente: o site não tem token (colocá-lo no
+ * planilha-site.js o deixaria visível no código da página), então o
+ * cardápio voltaria a mostrar o exemplo embutido para todo mundo,
+ * menos para o dono — que testa no mesmo navegador e vê funcionando.
+ * O TOKEN protege o POST, que é o que realmente importa: sem ele,
+ * qualquer pessoa com a URL gravaria pedidos falsos na planilha.
  */
 function doGet(e) {
   var parametro = (e && e.parameter) || {};
@@ -135,10 +147,6 @@ function doGet(e) {
       ok: true,
       mensagem: 'Cardápio digital conectado. Não é preciso abrir esta URL no navegador.'
     });
-  }
-
-  if (TOKEN && String(parametro.token || '') !== TOKEN) {
-    return responderLeia({ ok: false, erro: 'Token inválido.' });
   }
 
   var menu;

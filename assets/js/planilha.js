@@ -58,17 +58,41 @@
      navegador: o cliente chega no site pela primeira vez e nunca
      preencheu nada.
 
-     Entao o endereco viaja no proprio site, em planilha-site.js. O
-     painel sobrescreve com o que esta no localStorage dele, que e o
-     mesmo par — assim quem testa na maquina ve a planilha mesmo
-     sem ter publicado o arquivo de configuracao. */
+     Entao o endereco viaja no proprio site, em planilha-site.js.
+
+     Quem manda no cartapio do cliente e esse arquivo. O que estiver
+     guardado no navegador NAO vale, e a razao e pratica: o painel roda
+     no mesmo site, no mesmo navegador e no mesmo localStorage. Como
+     o dono preenche a URL uma vez no painel, ela fica gravada ali
+     para sempre — e quando ele cria uma implantacao nova e atualiza
+     o planilha-site.js, o proprio navegador dele continua lendo a
+     implantacao velha. Foi assim que um token novo passou por
+     funcionando: o dono testava contra a implantacao sem token, e
+     todo visitante novo recebia "Token invalido".
+
+     O painel e a excecao de proposito: ele precisa testar contra uma
+     URL diferente (uma planilha de ensaio, um servidor local) sem
+     mexer no arquivo que vai junto com o site. Ele pede isso com
+     usarUrlDoPainel(), e ai o localStorage manda. */
+  var usarUrlDoPainel = false;
+
   function cfg() {
     var base = (window.CardapioStore && window.CardapioStore.dados().config) || {};
     var doSite = (window.CardapioSite && typeof window.CardapioSite === 'object') ? window.CardapioSite : {};
 
+    if (usarUrlDoPainel) {
+      return {
+        planilhaUrl: base.planilhaUrl || doSite.planilhaUrl || '',
+        planilhaToken: base.planilhaToken || doSite.planilhaToken || ''
+      };
+    }
+
+    /* O token do navegador nao vai para a leitura publica. Ele nao
+       esta no planilha-site.js de proposito — quem abrir o codigo da
+       pagina leria junto — e a leitura nao exige token mesmo. */
     return {
-      planilhaUrl: base.planilhaUrl || doSite.planilhaUrl || '',
-      planilhaToken: base.planilhaToken || doSite.planilhaToken || ''
+      planilhaUrl: doSite.planilhaUrl || base.planilhaUrl || '',
+      planilhaToken: doSite.planilhaToken || ''
     };
   }
 
@@ -866,6 +890,7 @@
     ultimoEnvio: ultimoEnvio,
     enderecosDeImagem: enderecosDeImagem,
     siteConfigurado: siteConfigurado,
+    usarUrlDoPainel: function (ligar) { usarUrlDoPainel = !!ligar; },
     cabecalhos: {
       pedidos: CABECALHO_PEDIDOS,
       itens: CABECALHO_ITENS,
