@@ -3,9 +3,9 @@
    ============================================================= */
 
 :root {
-  --primaria: #e8590c;
-  --primaria-escura: #c9480a;
-  --primaria-clara: #fff1e8;
+  --primaria: #8B1A1A;
+  --primaria-escura: #6B1010;
+  --primaria-clara: #FFF5F5;
 
   --fundo: #f6f6f4;
   --superficie: #ffffff;
@@ -36,6 +36,13 @@
      (--primaria-escura) e o unico que passa em 4.5:1. */
   --primaria-texto: var(--primaria-escura);
 
+  /* --- Paleta da marca Pastelaria do CAÊ ----------------------- */
+  --marca-amarelo: #F5A623;
+  --marca-amarelo-escuro: #D4891A;
+  --marca-vermelho: #8B1A1A;
+  --marca-vermelho-escuro: #6B1010;
+  --marca-branco: #FFFFFF;
+
   --raio: 14px;
   --raio-sm: 9px;
   --sombra: 0 1px 2px rgba(0, 0, 0, .05), 0 6px 20px rgba(0, 0, 0, .06);
@@ -60,7 +67,7 @@
 
     --primaria-clara: #3a1f0d;
     /* No escuro a cor pura da marca ja contrasta com o fundo. */
-    --primaria-texto: var(--primaria);
+    --primaria-texto: var(--marca-amarelo);
     --sucesso-texto: #63d18b;
     --perigo-texto: #ff8787;
     --sucesso-fundo: rgba(47, 143, 78, .18);

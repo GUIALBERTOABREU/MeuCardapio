@@ -207,7 +207,7 @@
       descricao: 'Lanches, porções e bebidas geladas',
       whatsapp: '5511999999999',
       mensagemAbertura: 'Olá! Gostaria de fazer um pedido no cardápio digital:',
-      corPrimaria: '#e8590c',
+      corPrimaria: '#8B1A1A',
       simboloMoeda: 'R$',
       taxaEntrega: 0,
       pedidoMinimo: 0,
