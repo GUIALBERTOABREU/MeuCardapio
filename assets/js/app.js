@@ -899,9 +899,8 @@
 
   /* ---------- cardapio publicado na planilha ----------
      A planilha do Google e a fonte da verdade: categorias,
-     itens, precos, destaques, imagens e os dados da loja. O
-     Apps Script nao devolve cabecalho CORS, entao a leitura usa
-     JSONP (planilha.js).
+     itens, precos, destaques, imagens e os dados da loja. A
+     leitura e um fetch comum (planilha.js).
 
      A tela ja aparece com o que o navegador tinha guardado, e a
      planilha troca tudo no lugar quando responde. Se ela falhar,

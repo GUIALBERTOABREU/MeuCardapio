@@ -294,9 +294,10 @@ https://script.google.com/macros/s/SEU_ID/exec?callback=cardapioLer1&token=SEU_T
 
 Essa linha pode ser colada direto no campo **URL do Web App**. O `?callback=` e o
 `?token=` são removidos antes de qualquer chamada e montados de novo, então não
-sobra `??` nem token duplicado. Se você colar a URL com o token e deixar o campo
-**Token do script** vazio, o token é aproveitado de onde veio — mas **preencha os
-dois campos** se puder: deixar o token na URL e no campo é pedir para eles divergirem
+sobra `??` nem token duplicado. (Na leitura o `callback` nem é enviado: o `fetch`
+comum não precisa dele.) Se você colar a URL com o token e deixar o campo **Token
+do script** vazio, o token é aproveitado de onde veio — mas **preencha os dois
+campos** se puder: deixar o token na URL e no campo é pedir para eles divergirem
 sem você perceber.
 
 Só o `/exec` é obrigatório. `SEU_ID` e `SEU_TOKEN` são placeholders: troque pelo
@@ -329,17 +330,29 @@ Ao abrir a página, o `index.html` lê a planilha e monta tudo: as abas de categ
 (com o emoji da coluna `Icone`), os itens, os preços, os destaques, as imagens, o
 nome da loja, a cor e o número do WhatsApp.
 
-O caminho é **JSONP**, não um `fetch`: o ContentService do Apps Script não manda
-cabeçalhos CORS, então uma leitura comum seria barrada pelo navegador. Com JSONP o
-navegador executa um `<script>` de outra origem, e o script responde chamando uma
-função que o cardápio criou antes. O preço é que esse texto roda como código na
-origem do site — por isso o script recorta o nome do callback para `[A-Za-z0-9_$]`
-e exige o mesmo `TOKEN` da escrita.
+O caminho é um **`fetch` comum**: o Apps Script responde com
+`Access-Control-Allow-Origin: *`, então o navegador lê a resposta de outra origem
+sem barrar nada. O `GET` sem parâmetro devolve o cardápio em JSON puro.
+
+O `GET` com `?callback=nome` continua existindo (JSONP), mas só como reserva para
+navegador muito antigo sem `fetch`. Ele **não** é o caminho principal porque o
+Chrome passou a bloquear o JSONP do Apps Script: o script responde
+`application/json` (e não `text/javascript`), e o ORB (*Opaque Response Blocking*)
+recusa a resposta como se fosse código. O sintoma é silencioso — o cardápio mostra
+o exemplo embutido e o navegador só registra `net::ERR_BLOCKED_BY_ORB` no console.
+O `fetch` não depende do tipo da resposta, então não sofre com isso.
 
 Detalhes que importam:
 
 - A leitura tem **tempo limite de 8 segundos**. Um Web App publicado errado não
   segura o cardápio em "carregando".
+- Se o Google **responder** — mesmo dizendo "erro" — o cardápio mostra essa
+  resposta e não tenta o JSONP, porque a resposta do servidor é a melhor pista
+  que existe. O JSONP só entra quando o `fetch` não chega ao servidor.
+- Script desatualizado é detectado e apontado: se o `GET` volta sem `menu`, o
+  cardápio diz que o `planilha.gs` publicado no Google está velho e que é preciso
+  criar uma implantação nova. Sem isso o dono concluiria que a planilha está vazia
+  e republicaria sem consertar nada.
 - A página **já aparece** com o que o navegador tinha guardado e troca tudo no
   lugar quando a planilha responde. Se a planilha falhar, o cardápio continua
   aparecendo — um cardápio velho é melhor do que tela vazia.
@@ -524,10 +537,11 @@ Google continua podendo ler e apagar a planilha.
 ### Limites que valem saber
 
 - O envio é `POST` com `mode: 'no-cors'`, porque o Apps Script não devolve cabeçalhos
-  CORS. Isso significa que o navegador **não consegue ler a resposta**: se a URL
-  estiver errada, o botão de teste só avisa que a chamada saiu. Quem confirma a
-  gravação é a aba `Registro` do script. Já a **leitura** volta por JSONP e responde
-  na tela de verdade.
+  CORS nesse caminho. Isso significa que o navegador **não consegue ler a resposta**:
+  se a URL estiver errada, o botão de teste só avisa que a chamada saiu. Quem confirma
+  a gravação é a aba `Registro` do script. Já a **leitura** usa um `GET` comum, que o
+  Apps Script devolve com `Access-Control-Allow-Origin: *` e portanto chega na tela de
+  verdade, com o erro legível se algo estiver errado.
 - Free do Google: 20 mil células por dia numa conta, bem acima do volume de uma
   lanchonete. O limite real costuma ser o do próprio navegador.
 - **`file://` não funciona com planilha nenhuma.** Abrir a pasta com dois cliques
@@ -573,8 +587,9 @@ esperando o Google.
 
 1. Troque o WhatsApp do exemplo pelo número real
 2. Troque a senha do painel
-3. Publique o `planilha.gs` no Google e **crie uma implantação nova** (o `doGet` com
-   JSONP e a aba `Config` são do script novo; a implantação antiga não os tem)
+3. Publique o `planilha.gs` no Google e **crie uma implantação nova** (o `doGet` que
+   devolve o cardápio e a aba `Config` são do script novo; a implantação antiga não os
+   tem). O cardápio avisa "script desatualizado" quando encontra a versão velha
 4. Cole a URL em **Configurações** do painel e clique uma vez em **Enviar cardápio
    agora** — é isso que cria as abas `Cardápio` e `Config`
 5. Cole a **mesma URL** em `assets/js/planilha-site.js` e **publique o site de novo**.

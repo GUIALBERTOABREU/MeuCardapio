@@ -510,22 +510,98 @@
   }
 
   /* ---------------------------------------------------------
-     3b. Leitura do cardapio publicado (JSONP)
+     3b. Leitura do cardapio publicado
      ---------------------------------------------------------
-     O Apps Script nao devolve cabecalho CORS, entao um fetch
-     seria barrado. JSONP contorna: o navegador executa
-     <script> de outra origem sem reclamar, e o script responde
-     chamando uma funcao que criamos antes.
+     O caminho normal e um fetch comum: o Apps Script responde com
+     `Access-Control-Allow-Origin: *`, entao o navegador le a
+     resposta de outra origem sem barrar nada.
 
-     Cuidado: o texto devolvido roda como codigo na nossa
-     pagina. Por isso o nome da funcao nasce com prefixo fixo e
-     um contador, nunca com nada vindo de fora.
+     O JSONP fica so como reserva, para navegador muito antigo sem
+     fetch. Ele nao e mais o principal porque o Chrome passou a
+     BLOQUEAR JSONP do Apps Script: o script responde
+     `application/json` (e nao `text/javascript`), e o ORB
+     (Opaque Response Blocking) recusa a resposta como se fosse
+     codigo. O cardapio ficava mostrando o exemplo embutido sem
+     nenhum aviso, e o navegador so contava no console
+     `net::ERR_BLOCKED_BY_ORB`.
+
+     Cuidado: o texto devolvido pelo JSONP roda como codigo na
+     nossa pagina. Por isso o nome da funcao nasce com prefixo
+     fixo e um contador, nunca com nada vindo de fora.
      --------------------------------------------------------- */
   var contadorCallback = 0;
 
   function lerCardapio() {
     if (!configurada()) return Promise.resolve({ ignorado: true, motivo: 'sem-url' });
+    /* So vale tentar o JSONP quando o fetch nao chegou a uma resposta
+       nenhuma (sem rede, CORS barrado, tempo esgotado). Se o Google
+       respondeu — mesmo dizendo "erro" — a resposta dele e a melhor
+       pista que temos, e trocar pelo JSONP esconderia a causa. */
+    return lerPorFetch().then(function (r) {
+      return (r.ok || r.ignorado || r.definido) ? r : lerPorJsonp();
+    });
+  }
 
+  /* fetch comum, com timeout. Nao ha AbortController em WebView
+     antiga, entao a corrida e feita com uma bandera. */
+  function lerPorFetch() {
+    var chave = token();
+    var url = comParams(chave ? 'token=' + encodeURIComponent(chave) : '');
+
+    return new Promise(function (resolve) {
+      var pronto = false;
+
+      function responder(r) {
+        if (pronto) return;
+        pronto = true;
+        resolve(r);
+      }
+
+      setTimeout(function () {
+        responder({ ok: false, erro: 'Tempo esgotado ao buscar o cardápio na planilha.' });
+      }, 8000);
+
+      fetch(url, { credentials: 'omit', redirect: 'follow' })
+        .then(function (resp) {
+          if (!resp.ok) {
+            responder({ ok: false, definido: true, erro: 'A planilha respondeu ' + resp.status + '.' });
+            return null;
+          }
+          return resp.json();
+        })
+        .then(function (json) {
+          if (json === null) return;
+          if (!json || json.ok !== true) {
+            responder({
+              ok: false, definido: true,
+              erro: (json && json.erro) || 'Resposta inesperada do script.'
+            });
+            return;
+          }
+
+          /* O script antigo (antes da aba Config) respondia a um GET
+             sem callback so com um "conectado", sem cardapio. Sem
+             esta distincao o dono acharia que a planilha estava
+             vazia, quando na verdade o script esta desatualizado. */
+          if (!json.menu) {
+            responder({
+              ok: false, definido: true,
+              erro: 'O script publicado no Google está desatualizado: ele respondeu, mas sem cardápio. ' +
+                    'Cole o planilha.gs novo no Apps Script e crie uma implantação nova ' +
+                    '(Implantar → Nova implantação).'
+            });
+            return;
+          }
+
+          responder({ ok: true, menu: json.menu, config: json.config });
+        })
+        .catch(function (e) {
+          responder({ ok: false, erro: 'Falha de rede ao ler a planilha: ' + (e && e.message ? e.message : e) });
+        });
+    });
+  }
+
+  function lerPorJsonp() {
     /* O nome precisa usar SO [A-Za-z0-9_$]: o script recorta
        qualquer outro caractere do callback antes de montar a
        resposta, e um nome com "__" nos cantos chegaria la com um

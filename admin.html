@@ -175,8 +175,9 @@
           <p class="dica" style="margin:14px 0 0;color:var(--texto-suave);font-size:.88rem">
             O botão de envio é em <code>no-cors</code>: o navegador não consegue ler a resposta do
             Google, então a confirmação de verdade é ver a aba <code>Registro</code> do script.
-            <em>Buscar da planilha</em> usa JSONP e devolve o que está publicado — é por ele que
-            o painel enxerga as alterações feitas direto no Google.
+            <em>Buscar da planilha</em> usa um <code>GET</code> comum e devolve o que está
+            publicado — é por ele que o painel enxerga as alterações feitas direto no Google,
+            e é ele que avisa se o script no Google estiver desatualizado.
           </p>
 
           <p id="avisoSite" class="aviso-publicar oculto" role="status" style="margin-top:14px">

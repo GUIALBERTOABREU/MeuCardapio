@@ -99,39 +99,46 @@ function doPost(e) {
 }
 
 /**
- * GET serve para duas coisas:
+ * GET devolve o cardápio publicado (abas Cardápio e Config) em JSON.
  *
- *   ?callback=nome   devolve o cardápio publicado (abas Cardápio e
- *                    Config) embrulhado em `nome({...})` — é JSONP
- *   sem callback     só confirma que o Web App está no ar
+ *   sem parâmetro      o cardápio, em JSON puro — é o jeito que o
+ *                      navegador usa (fetch comum)
+ *   ?callback=nome   o mesmo cardápio embrulhado em `nome({...})` —
+ *                    JSONP, só para navegador muito antigo
+ *   ?ping=1          só confirma que o Web App está no ar
  *
- * Por que JSONP e não um fetch normal? O ContentService do Apps
- * Script não manda cabeçalhos CORS, então um GET com fetch seria
- * barrado pelo navegador. O JSONP contorna isso: o navegador não
- * bloqueia <script> de outra origem, e a resposta é executada
- * como função dentro da nossa página.
+ * Por que fetch e não JSONP? O Apps Script responde com
+ * `Access-Control-Allow-Origin: *`, então um fetch comum lê a
+ * resposta sem dificuldade. O JSONP exigiria que a resposta viesse
+ * como `text/javascript` — e quando ela vem como `application/json`,
+ * o Chrome bloqueia com ORB (Opaque Response Blocking) e o cardápio
+ * fica sem nunca ler a planilha, sem aviso nenhum. O fetch não
+ * depende do tipo da resposta, então não sofre com isso.
  *
- * O preço disso é que o JSONP roda como código na origem do site.
- * Por isso validamos o nome do callback e exigimos o mesmo TOKEN
- * da escrita quando ele estiver configurado.
+ * O JSONP continua existindo como reserva. O preço dele é rodar como
+ * código na origem do site, por isso validamos o nome do callback e
+ * exigimos o mesmo TOKEN da escrita quando ele estiver configurado.
  */
 function doGet(e) {
   var parametro = (e && e.parameter) || {};
 
-  if (!parametro.callback) {
+  /* O callback vai colado no código executado. Aceitar qualquer
+     caractere aqui permitiria injetar JavaScript arbitrário. */
+  var bruto = String(parametro.callback || '');
+  var callback = bruto.replace(/[^A-Za-z0-9_$]/g, '');
+  if (bruto && !callback) return responder({ ok: false, erro: 'Callback inválido.' });
+
+  var responderLeia = callback ? function (o) { return responderJsonp(callback, o); } : responder;
+
+  if (parametro.ping) {
     return responder({
       ok: true,
       mensagem: 'Cardápio digital conectado. Não é preciso abrir esta URL no navegador.'
     });
   }
 
-  /* O callback vai colado no código executado. Aceitar qualquer
-     caractere aqui permitiria injetar JavaScript arbitrário. */
-  var callback = String(parametro.callback).replace(/[^A-Za-z0-9_$]/g, '');
-  if (!callback) return responder({ ok: false, erro: 'Callback inválido.' });
-
   if (TOKEN && String(parametro.token || '') !== TOKEN) {
-    return responderJsonp(callback, { ok: false, erro: 'Token inválido.' });
+    return responderLeia({ ok: false, erro: 'Token inválido.' });
   }
 
   var menu;
@@ -142,13 +149,13 @@ function doGet(e) {
     config = lerConfig();
   } catch (erro) {
     registrar('erro', 'leitura do cardapio: ' + erro.message);
-    return responderJsonp(callback, { ok: false, erro: erro.message });
+    return responderLeia({ ok: false, erro: erro.message });
   }
 
   /* menu vazio e config null sao respostas legitimas: significam
      "a planilha existe mas ainda nao foi publicada". O navegador
      entende isso e mantem o que ja tinha. */
-  return responderJsonp(callback, { ok: true, menu: menu, config: config });
+  return responderLeia({ ok: true, menu: menu, config: config });
 }
 
 /* ------------------------------------------------------------------
@@ -229,8 +236,8 @@ function precoDe(valor) {
    removemos aspas e "=" inicial antes de gravar; aqui aceitaremos
    link absoluto http(s) OU caminho relativo (img/arquivo.jpg) para
    permitir imagens locais junto ao index.html. Caminhos relativos
-   sao retornados como estao para o JSONP; o navegador resolve
-   relativamente ao dominio/arquivo. */
+   sao retornados como estao; o navegador resolve relativamente ao
+   dominio/arquivo. */
 function linkDe(valor) {
   var s = String(valor === null || valor === undefined ? '' : valor).trim();
   if (!s) return '';
@@ -346,8 +353,9 @@ function lerConfig() {
 }
 
 /**
- * Empacota o JSON numa chamada de função. É o truque do JSONP:
- * o texto devolvido precisa ser JavaScript válido, não JSON puro.
+ * Empacota o JSON numa chamada de função. É o truque do JSONP, e
+ * só entra em uso por navegador muito antigo: o texto devolvido
+ * precisa ser JavaScript válido, não JSON puro.
  */
 function responderJsonp(callback, objeto) {
   return ContentService
