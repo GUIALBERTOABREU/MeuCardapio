@@ -954,12 +954,11 @@ function escreverAba(spec, acao, origem) {
    coluna extra ficaria sem título e o dono não saberia o que é. Só
    escreve as colunas que faltam, para não mexer no que já está lá. */
 function sincronizarCabecalho(aba, cabecalho) {
-  var atual = aba.getRange(1, 1, 1, Math.max(1, aba.getLastColumn())).getValues()[0];
-  var jaTem = 0;
-  while (jaTem < atual.length && String(atual[jaTem] || '').trim()) jaTem++;
-
-  for (var i = jaTem; i < cabecalho.length; i++) {
-    aba.getRange(1, i + 1).setValues([[cabecalho[i]]]);
+  /* Escreve TODAS as colunas do cabeçalho, não apenas as que faltam.
+     Se a planilha foi criada antes de uma coluna nova ser adicionada
+     (ex.: Bairro), a coluna pode não estar sendo escrita corretamente. */
+  for (var i = 0; i < cabecalho.length; i++) {
+    aba.getRange(1, i + 1).setValue(cabecalho[i]);
   }
 }
 
