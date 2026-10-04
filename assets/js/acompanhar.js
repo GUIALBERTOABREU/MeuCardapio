@@ -67,6 +67,10 @@
     { titulo: 'Concluído', texto: 'Pedido finalizado. Bom apetite!' }
   ];
 
+  /* A lista de status que o operador escolhe vive no planilha.js
+     (STATUS_PEDIDO) e é a mesma nas duas páginas. Aqui traduzimos
+     qualquer texto — inclusive sinônimos que o dono digite à mão,
+     como "Entregue" — para um dos passos acima. */
   function chaveDoStatus(status) {
     var s = semAcento(status);
     if (!s || s === 'novo' || s === 'recebido' || s === 'aguardando') return 'novo';

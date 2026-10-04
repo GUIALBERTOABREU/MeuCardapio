@@ -8,7 +8,7 @@
   <meta name="description" content="Gerencie os pedidos da Pastelaria do CAÊ">
   <meta name="robots" content="noindex">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
-  <link rel="stylesheet" href="assets/css/style.css">
+  <link rel="stylesheet" href="assets/css/style.css?v=20261004c">
   <style>
     .gerenciar-container {
       max-width: 1200px;
@@ -216,13 +216,6 @@
         <label for="filtroStatus">Filtrar por status</label>
         <select id="filtroStatus">
           <option value="">Todos os status</option>
-          <option value="Novo">Novo</option>
-          <option value="Aguardando">Aguardando</option>
-          <option value="Preparando">Preparando</option>
-          <option value="Preparado">Preparado</option>
-          <option value="Saiu para entrega">Saiu para entrega</option>
-          <option value="Entregue">Entregue</option>
-          <option value="Cancelado">Cancelado</option>
         </select>
       </div>
       <button type="button" class="btn btn-contorno" id="btnLimparFiltros">Limpar filtros</button>
@@ -241,8 +234,8 @@
 
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-  <script src="assets/js/planilha-site.js"></script>
-  <script src="assets/js/planilha.js"></script>
+  <script src="assets/js/planilha-site.js?v=20261004c"></script>
+  <script src="assets/js/planilha.js?v=20261004c"></script>
   <script>
     (function () {
       'use strict';
@@ -252,7 +245,23 @@
       var pedidos = [];
       var temporizador = null;
 
-      var STATUS_VALIDOS = ['Novo', 'Aguardando', 'Preparando', 'Preparado', 'Saiu para entrega', 'Entregue', 'Cancelado'];
+      /* A lista vem do módulo compartilhado (planilha.js), o mesmo que
+         a página Acompanhar usa — assim as duas nunca saem de
+         sincronia. O último status é "Concluído", igual ao que o
+         cliente vê no acompanhamento. Sem argumento aqui: o FILTRO
+         precisa mostrar todos, porque ele vale para a lista inteira.
+         O seletor de cada pedido usa a lista do tipo dele (abaixo). */
+      var STATUS_VALIDOS = (P && P.statusValores)
+        ? P.statusValores()
+        : ['Novo', 'Preparando', 'Preparado', 'Saiu para entrega', 'Concluído', 'Cancelado'];
+
+      /* Status que fazem sentido para um pedido de certo tipo: entrega
+         não fica "pronto para retirada" e retirada não "saiu para
+         entrega". Tipo vazio/desconhecido mantém a lista inteira. */
+      function statusDoPedido(tipo) {
+        if (P && P.statusValores) return P.statusValores(tipo);
+        return STATUS_VALIDOS;
+      }
 
       function $(sel) { return document.querySelector(sel); }
 
@@ -405,7 +414,8 @@
             return '<li>' + esc(linha) + '</li>';
           }).join('');
 
-          var opcoesStatus = STATUS_VALIDOS.map(function (s) {
+          /* só os status válidos para o tipo deste pedido */
+          var opcoesStatus = statusDoPedido(p.tipo).map(function (s) {
             return '<option value="' + esc(s) + '"' + (p.status === s ? ' selected' : '') + '>' + esc(s) + '</option>';
           }).join('');
 
@@ -451,6 +461,16 @@
         });
       }
 
+      /* Preenche o filtro com a MESMA lista usada no seletor de cada
+         pedido, para as duas pontas não divergirem. */
+      function montarFiltroStatus() {
+        var html = '<option value="">Todos os status</option>';
+        html += STATUS_VALIDOS.map(function (s) {
+          return '<option value="' + esc(s) + '">' + esc(s) + '</option>';
+        }).join('');
+        el.filtroStatus.innerHTML = html;
+      }
+
       function ligarEventos() {
         el.filtroData.addEventListener('change', renderPedidos);
         el.filtroStatus.addEventListener('change', renderPedidos);
@@ -483,6 +503,7 @@
           toasts: $('#toasts')
         };
 
+        montarFiltroStatus();
         ligarEventos();
         buscarPedidos();
 

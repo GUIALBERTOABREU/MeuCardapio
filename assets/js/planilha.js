@@ -70,6 +70,62 @@
   ];
 
   /* ---------------------------------------------------------
+     Status do pedido (Gerenciar Pedidos + Acompanhar)
+     ---------------------------------------------------------
+     Uma lista só, usada pelas DUAS páginas, para elas não saírem
+     de sincronia. O operador escolhe um destes valores na tela
+     Gerenciar Pedidos; é esse texto que vai para a coluna "Status"
+     da planilha e o que o cliente acompanha na tela Acompanhar.
+
+     "passo" é onde o valor encaixa na barra de progresso do
+     Acompanhar:
+       0 = Recebido     1 = Em preparo
+       2 = A caminho / Pronto para retirada
+       3 = Concluído    -1 = Cancelado (não usa a barra)
+
+     "tipo" limita um status a um tipo de pedido (entrega ou
+     retirada). As duas opções do passo 2 são mutuamente exclusivas:
+     um pedido de retirada não "saiu para entrega", e um pedido de
+     entrega não fica "pronto para retirada". Sem o campo, o status
+     vale para qualquer tipo.
+
+     A tela Acompanhar também entende sinônimos que o dono possa ter
+     digitado à mão (ex.: "Entregue", "Saiu", "Em preparo") — esta
+     lista é o que a tela OFERECE ao operador, não o limite do que é
+     aceito na leitura. */
+  var STATUS_PEDIDO = [
+    { valor: 'Novo',              passo: 0 },
+    { valor: 'Preparando',        passo: 1 },
+    { valor: 'Preparado',         passo: 2, tipo: 'retirada' },
+    { valor: 'Saiu para entrega', passo: 2, tipo: 'entrega' },
+    { valor: 'Concluído',         passo: 3 },
+    { valor: 'Cancelado',         passo: -1 }
+  ];
+
+  /* O texto do Tipo na planilha é "Entrega"/"Retirada" (com letra
+     maiúscula), mas o dono pode digitar qualquer variação — daí a
+     comparação frouxa, a mesma que o Acompanhar faz. */
+  function tipoEhRetirada(tipo) {
+    var t = String(tipo == null ? '' : tipo).toLowerCase().trim();
+    return t.indexOf('retirada') >= 0 || t.indexOf('retirar') >= 0 ||
+           t.indexOf('balcao') >= 0 || t.indexOf('presencial') >= 0;
+  }
+
+  /* Só os textos, na ordem em que aparecem no seletor do operador.
+     Sem argumento devolve a lista inteira (é o que o filtro usa).
+     Com "entrega" ou "retirada" devolve só os status que servem para
+     esse tipo — assim o operador não marca "Pronto para retirada" num
+     pedido de entrega. Tipo vazio/desconhecido devolve tudo, para não
+     esconder nenhum status sem querer. */
+  function statusValores(tipo) {
+    var temTipo = String(tipo == null ? '' : tipo).trim() !== '';
+    return STATUS_PEDIDO.filter(function (s) {
+      if (!s.tipo || !temTipo) return true;
+      return s.tipo === (tipoEhRetirada(tipo) ? 'retirada' : 'entrega');
+    }).map(function (s) { return s.valor; });
+  }
+
+  /* ---------------------------------------------------------
      1. Utilidades
      --------------------------------------------------------- */
   /* O URL da planilha nao cabe na planilha — seria circular: preciso
@@ -1146,6 +1202,8 @@
       bairros: CABECALHO_BAIRROS,
       opcoes: CABECALHO_OPCOES
     },
-    camposConfig: CAMPOS_CONFIG
+    camposConfig: CAMPOS_CONFIG,
+    statusPedido: STATUS_PEDIDO,
+    statusValores: statusValores
   };
 })();

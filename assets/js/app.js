@@ -1127,73 +1127,24 @@
     var corpo = blocoPix(qrHtml, payload, valor);
     var titulo = Store.dados().config.nome || 'Pagamento PIX';
 
+    /* Abre a pagina pix.html: uma pagina de verdade, que ja nasce
+       declarada como "somente clara". Assim o navegador NAO aplica o
+       "modo escuro automatico" na janela do QR -- era isso que
+       escurecia o codigo no celular. */
+    var urlPix = 'pix.html?p=' + encodeURIComponent(payload) +
+      '&v=' + encodeURIComponent(moeda(valor)) +
+      '&n=' + encodeURIComponent(titulo) +
+      '&bv=2';
+
     var janela = null;
-    try { janela = window.open('', '_blank'); } catch (e) { janela = null; }
+    try { janela = window.open(urlPix, '_blank'); } catch (e) { janela = null; }
 
-    if (janela && janela.document) {
-      janela.document.open();
-      janela.document.write(
-        '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
-        '<meta name="color-scheme" content="light dark">' +
-        '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
-        '<title>PIX — ' + esc(titulo) + '</title>' +
-        '<style>' + estiloPix() + '</style></head>' +
-        '<body><main class="pix-pagina">' +
-        '<h1 class="pix-titulo">' + esc(titulo) + '</h1>' +
-        corpo +
-        '<button type="button" class="btn btn-contorno btn-bloco" data-pix-fechar>Fechar</button>' +
-        '</main></body></html>'
-      );
-      janela.document.close();
-
-      ligarBotoesPix(janela.document);
-      var fechar = janela.document.querySelector('[data-pix-fechar]');
-      if (fechar) fechar.addEventListener('click', function () {
-        try { janela.close(); } catch (e) { /* ja fechou */ }
-      });
-
+    if (janela) {
       try { janela.focus(); } catch (e) { /* alguns navegadores nao deixam */ }
       return;
     }
 
     mostrarPixInline(corpo);
-  }
-
-  /* Estilos da janela do QR. Vai embutido porque a janela nasce em
-     about:blank e nao herda o CSS do site. */
-  function estiloPix() {
-    return '' +
-      '*{box-sizing:border-box}' +
-      'body{margin:0;background:#f6f6f4;color:#1c1b1a;' +
-        'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}' +
-      '.pix-pagina{max-width:420px;margin:0 auto;padding:24px 18px 40px;text-align:center}' +
-      '.pix-titulo{font-size:1.2rem;margin:0 0 18px}' +
-      ':root{color-scheme:light}' +
-      '.pix-qr{background:#fff;color-scheme:only light;border:1px solid #e4e4e1;border-radius:14px;padding:14px;margin:0 0 14px}' +
-      '.pix-qr svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto;' +
-        'color-scheme:only light;forced-color-adjust:none;-webkit-forced-color-adjust:none}' +
-      '.pix-qr img{display:block;width:100%;max-width:300px;height:auto;margin:0 auto;' +
-        'image-rendering:pixelated;-ms-interpolation-mode:nearest-neighbor}' +
-      '.pix-valor{font-size:1rem;margin:0 0 6px}' +
-      '.pix-aviso{font-size:.85rem;color:#8a4b12;background:#fdf3e3;border:1px solid #f0d9b5;' +
-        'border-radius:10px;padding:10px 12px;margin:0 0 14px;line-height:1.45;text-align:left}' +
-      '.pix-dica{font-size:.85rem;color:#63605a;margin:0 0 16px;line-height:1.5}' +
-      '.pix-rotulo{display:block;font-size:.8rem;font-weight:700;color:#63605a;margin:0 0 6px;text-align:left}' +
-      '.pix-codigo{width:100%;font:inherit;font-size:.82rem;padding:10px;border:1px solid #d3d3ce;' +
-        'border-radius:9px;background:#fff;resize:vertical;word-break:break-all}' +
-      '.btn{display:block;width:100%;padding:12px 16px;margin:14px 0 0;font:inherit;font-weight:700;' +
-        'border:1px solid #d3d3ce;border-radius:12px;background:transparent;color:#1c1b1a;cursor:pointer}' +
-      '.btn:hover{background:#fafaf9}' +
-      '@media (prefers-color-scheme: dark){' +
-        ':root{color-scheme:dark}' +
-        'body{background:#131312;color:#f2f1ef}' +
-        '.pix-qr{background:#fff;border-color:#302f2e}' +
-        '.pix-aviso{color:#f0c089;background:#3a2a14;border-color:#5c421d}' +
-        '.pix-dica,.pix-rotulo{color:#b3b0a9}' +
-        '.pix-codigo{background:#1c1c1b;color:#f2f1ef;border-color:#43423f}' +
-        '.btn{border-color:#43423f;color:#f2f1ef}' +
-        '.btn:hover{background:#1c1c1b}' +
-      '}';
   }
 
   /* Mostra o atalho do QR quando a forma de pagamento e PIX. */

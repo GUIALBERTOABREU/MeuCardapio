@@ -20,6 +20,6 @@
    ========================================================================= */
 
 window.CardapioSite = {
-  planilhaUrl: 'https://script.google.com/macros/s/AKfycbyr3Mi4XAT3xqkMvNAOcYmSLY4FjRSCtooC_P8z4OpSuVP8TrhHYD62uUzCETwezrGRqQ/exec',
+  planilhaUrl: 'https://script.google.com/macros/s/AKfycbz2jkv6A0uIjBSNd-nEoLFXrIelziKTEg5BUIlI83cZg5tozLVJ9lzECjmUmOnReH6-uA/exec',
   planilhaToken: 'GUIGA9805_LINDO'
 };

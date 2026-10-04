@@ -232,11 +232,18 @@ cada 15 segundos e desenha a linha do tempo:
 Recebido  →  Em preparo  →  A caminho / Pronto para retirada  →  Concluído
 ```
 
-O dono muda o status editando a coluna **Status** da aba `Pedidos` (padrão `Novo`;
-também entende `Em preparo`, `Saiu para entrega`, `Pronto para retirada`, `Concluído`
-e `Cancelado`). A página também aceita digitar o número à mão, então quem perdeu o
-link consegue acompanhar mesmo assim. Se o cliente fechar a faixa, o número sai do
-navegador dele.
+O dono muda o status na tela `gerenciarpedido.html` (ou editando a coluna **Status** da
+aba `Pedidos`). O seletor da tela oferece só os status que servem para o tipo do pedido:
+`Novo`, `Preparando`, `Concluído` e `Cancelado` para todos, mais **`Saiu para entrega`**
+em pedidos de entrega e **`Preparado`** em pedidos de retirada — nunca os dois no mesmo
+pedido, porque um não sai para entrega e o outro não fica pronto para retirada. A coluna
+**Status** na planilha é texto livre, então a página Acompanhar também entende sinônimos
+digitados à mão (`Em preparo`, `Saiu para entrega`, `Pronto para retirada`, `Concluído`,
+`Cancelado`).
+
+A página Acompanhar também aceita digitar o número à mão, então quem perdeu o link
+consegue acompanhar mesmo assim. Se o cliente fechar a faixa, o número sai do navegador
+dele.
 
 A consulta é uma leitura pública e leve (`?pedido=0310-117`): devolve só o status, sem
 arrastar o cardápio inteiro, porque a página pergunta de novo de tempo em tempo.

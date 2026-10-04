@@ -579,7 +579,7 @@ function lerPedidos() {
       taxa: colTaxa ? Number(linha[colTaxa - 1]) || 0 : 0,
       total: colTotal ? Number(linha[colTotal - 1]) || 0 : 0,
       observacoes: colObservacoes ? String(linha[colObservacoes - 1] || '').trim() : '',
-      status: colStatus ? String(linha[colStatus - 1] || '').trim() || 'Aguardando' : 'Aguardando',
+      status: colStatus ? String(linha[colStatus - 1] || '').trim() || 'Novo' : 'Novo',
       itens: colItens ? String(linha[colItens - 1] || '').trim() : ''
     });
   }
