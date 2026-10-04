@@ -143,6 +143,16 @@
               <span class="dica">Separe por vírgula. Vira uma lista no checkout. Vazio = campo de texto livre.</span>
             </div>
             <div class="campo">
+              <label for="cfgChavePix">Chave PIX</label>
+              <input type="text" id="cfgChavePix" placeholder="CPF/CNPJ, e-mail, telefone ou chave aleatória">
+              <span class="dica">Gera o QR Code do PIX no checkout. Vazio = não mostra o botão do QR.</span>
+            </div>
+            <div class="campo">
+              <label for="cfgPixCidade">Cidade do recebedor (PIX)</label>
+              <input type="text" id="cfgPixCidade" placeholder="Ex.: São Paulo" maxlength="15">
+              <span class="dica">Vai no QR Code do PIX. Vazio vira “BRASIL”.</span>
+            </div>
+            <div class="campo">
               <label for="cfgTempoEntrega">Tempo de entrega</label>
               <input type="text" id="cfgTempoEntrega" placeholder="40–60 min">
             </div>

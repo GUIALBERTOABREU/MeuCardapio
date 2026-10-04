@@ -648,6 +648,21 @@ main { padding: 24px 0 140px; min-height: 60vh; }
 .campo > label { font-size: .82rem; font-weight: 700; color: var(--texto-suave); }
 .campo .dica { font-size: .78rem; color: var(--texto-tenue); }
 
+/* ---------- PIX (QR no checkout) ---------- */
+.pix-caixa { display: flex; flex-direction: column; gap: 6px; }
+.pix-caixa:empty { display: none; }
+.pix-qr {
+  background: #fff; /* o QR precisa de fundo claro para ser lido */
+  border: 1px solid var(--borda);
+  border-radius: var(--raio);
+  padding: 12px;
+}
+.pix-qr svg { display: block; width: 100%; max-width: 280px; height: auto; margin: 0 auto; }
+.pix-valor { margin: 12px 0 2px; font-size: .95rem; }
+.pix-dica { margin: 0; font-size: .78rem; color: var(--texto-tenue); }
+.pix-rotulo { font-size: .8rem; font-weight: 700; color: var(--texto-suave); }
+.pix-codigo { font-size: .8rem; word-break: break-all; }
+
 input[type="text"], input[type="tel"], input[type="number"],
 input[type="email"], input[type="password"], input[type="search"],
 input[type="url"], input[type="date"], input[type="time"],

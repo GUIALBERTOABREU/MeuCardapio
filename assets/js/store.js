@@ -223,6 +223,9 @@
       tempoRetirada: '',
       enderecoLoja: '',
       instagram: '',
+      /* Chave PIX e cidade do recebedor, para o QR do checkout. */
+      chavePix: '',
+      pixCidade: '',
       planilhaUrl: '',
       planilhaToken: ''
     },
@@ -378,6 +381,8 @@
       tempoRetirada: texto(cfgOrigem.tempoRetirada, ''),
       enderecoLoja: texto(cfgOrigem.enderecoLoja, ''),
       instagram: texto(cfgOrigem.instagram, ''),
+      chavePix: texto(cfgOrigem.chavePix, ''),
+      pixCidade: texto(cfgOrigem.pixCidade, ''),
       planilhaUrl: planilhaUrl(cfgOrigem.planilhaUrl),
       planilhaToken: texto(cfgOrigem.planilhaToken, '')
     };

@@ -691,6 +691,8 @@
     el.cfgPedirEntrega.checked = c.pedirEntrega !== false;
     el.cfgEndereco.value = c.enderecoLoja || '';
     el.cfgInstagram.value = c.instagram || '';
+    el.cfgChavePix.value = c.chavePix || '';
+    el.cfgPixCidade.value = c.pixCidade || '';
     el.cfgPagamento.value = c.formasPagamento || '';
     el.cfgTempoEntrega.value = c.tempoEntrega || '';
     el.cfgTempoRetirada.value = c.tempoRetirada || '';
@@ -718,6 +720,8 @@
       cfgPedirEntrega: ['pedirEntrega', 'bool'],
       cfgEndereco: ['enderecoLoja', 'texto'],
       cfgInstagram: ['instagram', 'texto'],
+      cfgChavePix: ['chavePix', 'texto'],
+      cfgPixCidade: ['pixCidade', 'texto'],
       cfgPagamento: ['formasPagamento', 'texto'],
       cfgTempoEntrega: ['tempoEntrega', 'texto'],
       cfgTempoRetirada: ['tempoRetirada', 'texto'],
@@ -1378,6 +1382,8 @@
       cfgPedirEntrega: $('#cfgPedirEntrega'),
       cfgEndereco: $('#cfgEndereco'),
       cfgInstagram: $('#cfgInstagram'),
+      cfgChavePix: $('#cfgChavePix'),
+      cfgPixCidade: $('#cfgPixCidade'),
       cfgPagamento: $('#cfgPagamento'),
       cfgTempoEntrega: $('#cfgTempoEntrega'),
       cfgTempoRetirada: $('#cfgTempoRetirada'),

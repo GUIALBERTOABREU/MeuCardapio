@@ -62,7 +62,8 @@ var CAMPOS_CONFIG = [
   'nome', 'descricao', 'whatsapp', 'mensagemAbertura', 'corPrimaria',
   'simboloMoeda', 'taxaEntrega', 'pedidoMinimo', 'aberto',
   'mensagemFechado', 'pedirNome', 'pedirEntrega',
-  'formasPagamento', 'tempoEntrega', 'tempoRetirada', 'enderecoLoja', 'instagram'
+  'formasPagamento', 'tempoEntrega', 'tempoRetirada', 'enderecoLoja', 'instagram',
+  'chavePix', 'pixCidade'
 ];
 
 /* Aba de taxas por bairro: uma linha por bairro (Bairro, Taxa, Tempo,

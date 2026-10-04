@@ -49,6 +49,20 @@
       .replace(/'/g, '&#39;');
   }
 
+  /* Compara texto ignorando caixa e acento (bairro digitado no
+     endereco, forma de pagamento). Sem String.normalize, que uma
+     WebView antiga pode nao ter. */
+  function semAcento(txt) {
+    return String(txt == null ? '' : txt)
+      .toLowerCase()
+      .replace(/[áàâãä]/g, 'a')
+      .replace(/[éèêë]/g, 'e')
+      .replace(/[íìîï]/g, 'i')
+      .replace(/[óòôõö]/g, 'o')
+      .replace(/[úùûü]/g, 'u')
+      .replace(/ç/g, 'c');
+  }
+
   function $(sel) { return document.querySelector(sel); }
 
   function todosItens() {
@@ -912,6 +926,264 @@
       '</select></div>';
   }
 
+  /* ---------- bairro pelo endereco ----------
+     O bairro cadastrado que aparece no endereco digitado, se houver.
+     Nomes maiores vencem: se "Centro" e "Centro Historico" existem,
+     "Centro Historico" casa primeiro. */
+  function bairroNoEndereco(txt) {
+    var alvo = semAcento(txt).trim();
+    if (!alvo) return '';
+
+    var achados = bairrosAtivos().filter(function (b) {
+      var nome = semAcento(b.nome).trim();
+      return nome && alvo.indexOf(nome) >= 0;
+    });
+
+    achados.sort(function (a, b) {
+      return semAcento(b.nome).length - semAcento(a.nome).length;
+    });
+
+    return achados.length ? achados[0].nome : '';
+  }
+
+  /* O seletor de bairro acompanha o endereco: digitar "... - Jardim
+     America" seleciona Jardim America e a taxa certa entra no total.
+     Nao mexe quando o endereco nao cita bairro nenhum, para nao
+     apagar a escolha manual. */
+  function sugerirBairroDoEndereco(txt) {
+    var sel = el.modalCorpo.querySelector('#coBairro');
+    if (!sel) return;
+
+    var detectado = bairroNoEndereco(txt);
+    if (!detectado || detectado === sel.value) return;
+
+    sel.value = detectado;
+    coletarCliente();
+    atualizarPrevia();
+    renderBotaoCarrinho(); /* a taxa do bairro muda o total */
+  }
+
+  /* ---------- PIX ----------
+     O QR segue o "BR Code" do Banco Central: a chave que o dono
+     cadastrou, o nome e a cidade da loja e o valor do pedido. Tudo
+     em ASCII — acento em alguns apps de banco atrapalha a leitura. */
+  function campoEmv(id, valor) {
+    var v = String(valor == null ? '' : valor);
+    var n = String(v.length);
+    if (n.length < 2) n = '0' + n;
+    return id + n + v;
+  }
+
+  /* CRC-16/CCITT-FALSE, o mesmo do BR Code (polinomio 0x1021,
+     inicial 0xFFFF). */
+  function crc16Pix(str) {
+    var crc = 0xffff;
+    for (var i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (var j = 0; j < 8; j++) {
+        crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xffff;
+      }
+    }
+    var hex = crc.toString(16).toUpperCase();
+    while (hex.length < 4) hex = '0' + hex;
+    return hex;
+  }
+
+  /* Texto do BR Code: ASCII, maiusculo, sem simbolos e com o limite
+     de caracteres do campo (25 para o nome, 15 para a cidade). */
+  function textoPix(txt, limite) {
+    return semAcento(txt).toUpperCase()
+      .replace(/[^A-Z0-9 ]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, limite);
+  }
+
+  /* Monta o "PIX copia e cola" com o valor do pedido. Devolve '' se a
+     chave ainda nao foi cadastrada. */
+  function montarPixPayload(valor) {
+    var cfg = Store.dados().config;
+    var chave = String(cfg.chavePix || '').trim();
+    if (!chave) return '';
+
+    var nome = textoPix(cfg.nome, 25) || 'LOJA';
+    var cidade = textoPix(cfg.pixCidade, 15) || 'BRASIL';
+    var conta = campoEmv('00', 'br.gov.bcb.pix') + campoEmv('01', chave);
+
+    var p = '000201' +
+      campoEmv('26', conta) +
+      '52040000' +
+      '5303986';
+
+    var n = Number(valor) || 0;
+    if (n > 0) p += campoEmv('54', n.toFixed(2));
+
+    p += campoEmv('58', 'BR') +
+      campoEmv('59', nome) +
+      campoEmv('60', cidade) +
+      '62070503***' +
+      '6304';
+
+    return p + crc16Pix(p);
+  }
+
+  function qrPixSvg(payload) {
+    if (!window.qrcode) return '';
+    try {
+      var qr = window.qrcode(0, 'M');
+      qr.addData(payload);
+      qr.make();
+      var svg = qr.createSvgTag({ cellSize: 6, margin: 2 });
+      /* O rotulo acessivel fica no <div> que envolve o SVG. */
+      return svg.replace('<svg ', '<svg aria-hidden="true" focusable="false" ');
+    } catch (e) {
+      if (window.console && console.warn) console.warn('[cardapio] QR PIX:', e && e.message);
+      return '';
+    }
+  }
+
+  function blocoPix(svg, payload, valor) {
+    return '' +
+      '<div class="pix-qr" role="img" aria-label="QR Code PIX para pagar ' + esc(moeda(valor)) + '">' +
+        svg +
+      '</div>' +
+      '<p class="pix-valor">Valor: <strong>' + esc(moeda(valor)) + '</strong></p>' +
+      '<p class="pix-dica">Abra o aplicativo do seu banco, entre em PIX e aponte a câmera para o código. ' +
+        'Se preferir, use o “copia e cola”.</p>' +
+      '<label class="pix-rotulo" for="pixCopiaECola">PIX copia e cola</label>' +
+      '<textarea id="pixCopiaECola" class="pix-codigo" readonly rows="3">' + esc(payload) + '</textarea>' +
+      '<button type="button" class="btn btn-contorno btn-bloco pix-copiar" data-pix-copiar>Copiar código PIX</button>';
+  }
+
+  function copiarPix(doc, botao) {
+    var campo = doc.querySelector('#pixCopiaECola');
+    if (!campo) return;
+    try {
+      campo.focus();
+      campo.select();
+      var ok = doc.execCommand && doc.execCommand('copy');
+      if (botao) botao.textContent = ok ? 'Copiado! ✅' : 'Selecione o texto e copie (Ctrl+C)';
+    } catch (e) {
+      if (botao) botao.textContent = 'Selecione o texto e copie (Ctrl+C)';
+    }
+  }
+
+  function ligarBotoesPix(doc) {
+    var copiar = doc.querySelector('[data-pix-copiar]');
+    if (copiar) copiar.addEventListener('click', function () { copiarPix(doc, copiar); });
+  }
+
+  /* Fallback para quando o navegador bloqueia a janela nova (ou uma
+     WebView antiga nao abre popup): o QR aparece no proprio
+     checkout, para o cliente nao ficar sem pagar. */
+  function mostrarPixInline(corpo) {
+    var box = el.modalCorpo.querySelector('#coPix');
+    if (!box) return;
+    box.innerHTML = corpo;
+    ligarBotoesPix(document);
+    if (box.scrollIntoView) box.scrollIntoView();
+  }
+
+  function abrirQrPix() {
+    var valor = totalGeral();
+    var payload = montarPixPayload(valor);
+    if (!payload) {
+      avisar('O dono ainda não cadastrou a chave PIX.', 'erro');
+      return;
+    }
+
+    var svg = qrPixSvg(payload);
+    if (!svg) {
+      avisar('Não consegui gerar o QR Code do PIX agora.', 'erro');
+      return;
+    }
+
+    var corpo = blocoPix(svg, payload, valor);
+    var titulo = Store.dados().config.nome || 'Pagamento PIX';
+
+    var janela = null;
+    try { janela = window.open('', '_blank'); } catch (e) { janela = null; }
+
+    if (janela && janela.document) {
+      janela.document.open();
+      janela.document.write(
+        '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+        '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
+        '<title>PIX — ' + esc(titulo) + '</title>' +
+        '<style>' + estiloPix() + '</style></head>' +
+        '<body><main class="pix-pagina">' +
+        '<h1 class="pix-titulo">' + esc(titulo) + '</h1>' +
+        corpo +
+        '<button type="button" class="btn btn-contorno btn-bloco" data-pix-fechar>Fechar</button>' +
+        '</main></body></html>'
+      );
+      janela.document.close();
+
+      ligarBotoesPix(janela.document);
+      var fechar = janela.document.querySelector('[data-pix-fechar]');
+      if (fechar) fechar.addEventListener('click', function () {
+        try { janela.close(); } catch (e) { /* ja fechou */ }
+      });
+
+      try { janela.focus(); } catch (e) { /* alguns navegadores nao deixam */ }
+      return;
+    }
+
+    mostrarPixInline(corpo);
+  }
+
+  /* Estilos da janela do QR. Vai embutido porque a janela nasce em
+     about:blank e nao herda o CSS do site. */
+  function estiloPix() {
+    return '' +
+      '*{box-sizing:border-box}' +
+      'body{margin:0;background:#f6f6f4;color:#1c1b1a;' +
+        'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}' +
+      '.pix-pagina{max-width:420px;margin:0 auto;padding:24px 18px 40px;text-align:center}' +
+      '.pix-titulo{font-size:1.2rem;margin:0 0 18px}' +
+      '.pix-qr{background:#fff;border:1px solid #e4e4e1;border-radius:14px;padding:14px;margin:0 0 14px}' +
+      '.pix-qr svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto}' +
+      '.pix-valor{font-size:1rem;margin:0 0 6px}' +
+      '.pix-dica{font-size:.85rem;color:#63605a;margin:0 0 16px;line-height:1.5}' +
+      '.pix-rotulo{display:block;font-size:.8rem;font-weight:700;color:#63605a;margin:0 0 6px;text-align:left}' +
+      '.pix-codigo{width:100%;font:inherit;font-size:.82rem;padding:10px;border:1px solid #d3d3ce;' +
+        'border-radius:9px;background:#fff;resize:vertical;word-break:break-all}' +
+      '.btn{display:block;width:100%;padding:12px 16px;margin:14px 0 0;font:inherit;font-weight:700;' +
+        'border:1px solid #d3d3ce;border-radius:12px;background:transparent;color:#1c1b1a;cursor:pointer}' +
+      '.btn:hover{background:#fafaf9}' +
+      '@media (prefers-color-scheme: dark){' +
+        'body{background:#131312;color:#f2f1ef}' +
+        '.pix-qr{background:#fff;border-color:#302f2e}' +
+        '.pix-dica,.pix-rotulo{color:#b3b0a9}' +
+        '.pix-codigo{background:#1c1c1b;color:#f2f1ef;border-color:#43423f}' +
+        '.btn{border-color:#43423f;color:#f2f1ef}' +
+        '.btn:hover{background:#1c1c1b}' +
+      '}';
+  }
+
+  /* Mostra o atalho do QR quando a forma de pagamento e PIX. */
+  function atualizarPix(autoAbrir) {
+    var box = el.modalCorpo.querySelector('#coPix');
+    if (!box) return;
+
+    var sel = el.modalCorpo.querySelector('#coPagamento');
+    var valor = sel ? sel.value : '';
+    if (semAcento(valor).indexOf('pix') < 0) { box.innerHTML = ''; return; }
+
+    var cfg = Store.dados().config;
+    if (!String(cfg.chavePix || '').trim()) {
+      box.innerHTML = '<p class="dica">PIX selecionado. O dono ainda não cadastrou a chave PIX.</p>';
+      return;
+    }
+
+    box.innerHTML = '<button type="button" class="btn btn-contorno btn-bloco" data-ver-pix>' +
+      '📱 Ver QR Code PIX</button>' +
+      '<p class="dica">Abre em uma nova janela para você escanear.</p>';
+
+    if (autoAbrir) abrirQrPix();
+  }
+
   function renderCheckout() {
     modoCheckout = true;
     var cfg = Store.dados().config;
@@ -935,6 +1207,7 @@
         '</div>' +
 
         campoPagamento() +
+        '<div id="coPix" class="pix-caixa"></div>' +
 
         '<div class="campo"><label for="coObs">Observações gerais</label>' +
         '<textarea id="coObs" placeholder="Ex.: tocar o interfone, sem cebola no lanche…" maxlength="300">' + esc(cliente.obs || '') + '</textarea></div>' +
@@ -950,6 +1223,7 @@
       '<button type="button" class="btn btn-contorno btn-bloco" data-voltar-carrinho>← Voltar ao pedido</button>');
 
     atualizarPrevia();
+    atualizarPix(false);
   }
 
   function coletarCliente() {
@@ -1234,6 +1508,7 @@
       if (ev.target.closest('[data-checkout]')) { renderCheckout(); return; }
       if (ev.target.closest('[data-voltar-carrinho]')) { renderCarrinho(); return; }
       if (ev.target.closest('[data-enviar]')) { enviarWhatsApp(); return; }
+      if (ev.target.closest('[data-ver-pix]')) { abrirQrPix(); return; }
 
       /* modal de opcoes do item */
       var editar = ev.target.closest('[data-editar-opcoes]');
@@ -1285,6 +1560,8 @@
           ev.target.id === 'coObs' || ev.target.name === 'coTipo') {
         coletarCliente();
         atualizarPrevia();
+        if (ev.target.id === 'coEndereco') sugerirBairroDoEndereco(ev.target.value);
+        if (ev.target.id === 'coPagamento') atualizarPix(false);
       }
     });
 
@@ -1301,6 +1578,10 @@
         coletarCliente();
         atualizarPrevia();
         renderBotaoCarrinho(); /* a taxa do bairro muda o total */
+      } else if (ev.target.id === 'coPagamento') {
+        coletarCliente();
+        atualizarPrevia();
+        atualizarPix(true); /* escolher PIX abre o QR na hora */
       }
     });
 

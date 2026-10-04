@@ -53,6 +53,7 @@ cardapio/
         ├── planilha-site.js  # URL da planilha que o CLIENTE lê
         ├── store.js          # Dados, validação, salvar/carregar, senha
         ├── planilha.js       # Envio de pedidos e cardápio para o Google Sheets
+        ├── qrcode.min.js     # Gerador de QR Code (MIT, Kazuhiko Arase) para o PIX
         ├── app.js            # Cardápio, busca, carrinho, mensagem do WhatsApp
         ├── acompanhar.js     # Status do pedido, consulta de 15 em 15 segundos
         └── admin.js          # Painel: itens, categorias, config, planilha, JSON
@@ -112,11 +113,15 @@ cardapio/
    - Nome, WhatsApp, descrição, cor, taxa de entrega, pedido mínimo
    - Formas de pagamento, tempo de entrega/retirada
    - Endereço e Instagram
+   - **Chave PIX** e **Cidade do recebedor (PIX)**: geram o QR Code do PIX
+     no checkout. Deixe a chave vazia para não mostrar o botão do QR.
 
 4. **Configurar bairros**
    - Aba **Bairros**
    - Adicione bairros com taxa e tempo de entrega
    - O cliente escolhe o bairro no checkout e a taxa do bairro vence a taxa única
+   - No checkout, o **bairro também é selecionado sozinho** quando o cliente
+     digita o nome dele no endereço (ex.: "Rua X, 10 — Centro")
 
 5. **Publicar na planilha**
    - Clique em **⬆ Enviar cardápio agora**
@@ -144,6 +149,10 @@ cardapio/
 3. **Finalizar o pedido**
    - Clique no botão do carrinho 🛒
    - Preencha nome, endereço, bairro, pagamento
+   - Ao digitar o endereço, o **bairro é marcado automaticamente** se o nome dele aparecer no texto
+   - Se escolher **PIX**, aparece o botão **📱 Ver QR Code PIX**: ele abre uma
+     janela com o QR Code (com o valor do pedido) e o "PIX copia e cola".
+     Se o navegador bloquear a janela, o QR aparece no próprio checkout.
    - Clique em **Enviar pedido no WhatsApp**
    - O WhatsApp abre com a mensagem pronta
 

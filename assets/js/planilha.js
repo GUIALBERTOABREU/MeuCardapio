@@ -65,7 +65,8 @@
     'nome', 'descricao', 'whatsapp', 'mensagemAbertura', 'corPrimaria',
     'simboloMoeda', 'taxaEntrega', 'pedidoMinimo', 'aberto',
     'mensagemFechado', 'pedirNome', 'pedirEntrega',
-    'formasPagamento', 'tempoEntrega', 'tempoRetirada', 'enderecoLoja', 'instagram'
+    'formasPagamento', 'tempoEntrega', 'tempoRetirada', 'enderecoLoja', 'instagram',
+    'chavePix', 'pixCidade'
   ];
 
   /* ---------------------------------------------------------
