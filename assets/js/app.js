@@ -50,17 +50,24 @@
   }
 
   /* Compara texto ignorando caixa e acento (bairro digitado no
-     endereco, forma de pagamento). Sem String.normalize, que uma
-     WebView antiga pode nao ter. */
+     endereco, forma de pagamento, busca, texto do PIX). Usa o
+     String.normalize quando existe e cai numa tabela manual de
+     acentos quando nao existe: WebView antiga de Android nao tem
+     normalize, e chamar esse metodo la derrubava a geracao do PIX. */
   function semAcento(txt) {
-    return String(txt == null ? '' : txt)
-      .toLowerCase()
-      .replace(/[áàâãä]/g, 'a')
-      .replace(/[éèêë]/g, 'e')
-      .replace(/[íìîï]/g, 'i')
-      .replace(/[óòôõö]/g, 'o')
-      .replace(/[úùûü]/g, 'u')
-      .replace(/ç/g, 'c');
+    var s = String(txt == null ? '' : txt);
+    if (typeof s.normalize === 'function') {
+      s = s.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } else {
+      s = s
+        .replace(/[áàâãäÁÀÂÃÄ]/g, 'a')
+        .replace(/[éèêëÉÈÊË]/g, 'e')
+        .replace(/[íìîïÍÌÎÏ]/g, 'i')
+        .replace(/[óòôõöÓÒÔÕÖ]/g, 'o')
+        .replace(/[úùûüÚÙÛÜ]/g, 'u')
+        .replace(/[çÇ]/g, 'c');
+    }
+    return s.toLowerCase();
   }
 
   function $(sel) { return document.querySelector(sel); }
@@ -270,14 +277,6 @@
       });
       el.abas.appendChild(b);
     });
-  }
-
-  /* Tira acentos para a busca: "porcoes" acha "Porções". */
-  function semAcento(t) {
-    return String(t || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase();
   }
 
   function categoriasComResultado() {
@@ -1029,7 +1028,13 @@
   }
 
   function qrPixSvg(payload) {
-    if (!window.qrcode) return '';
+    if (!window.qrcode) {
+      if (window.console && console.warn) {
+        console.warn('[cardapio] QR PIX: biblioteca de QR nao carregada (qrcode.min.js). ' +
+          'O codigo "copia e cola" continua valendo.');
+      }
+      return '';
+    }
     try {
       var qr = window.qrcode(0, 'M');
       qr.addData(payload);
@@ -1044,10 +1049,18 @@
   }
 
   function blocoPix(svg, payload, valor) {
+    /* O QR e so um atalho: sem a biblioteca (ou se a geracao falhar)
+       o "copia e cola" abaixo continua sendo um PIX valido. Por isso
+       o bloco nunca fica so com o aviso de erro. */
+    var qr = svg
+      ? '<div class="pix-qr" role="img" aria-label="QR Code PIX para pagar ' + esc(moeda(valor)) + '">' +
+          svg +
+        '</div>'
+      : '<p class="pix-aviso">Não foi possível desenhar o QR Code agora, mas o código abaixo funciona igual: ' +
+        'abra o aplicativo do banco em PIX e use o “copia e cola”.</p>';
+
     return '' +
-      '<div class="pix-qr" role="img" aria-label="QR Code PIX para pagar ' + esc(moeda(valor)) + '">' +
-        svg +
-      '</div>' +
+      qr +
       '<p class="pix-valor">Valor: <strong>' + esc(moeda(valor)) + '</strong></p>' +
       '<p class="pix-dica">Abra o aplicativo do seu banco, entre em PIX e aponte a câmera para o código. ' +
         'Se preferir, use o “copia e cola”.</p>' +
@@ -1094,10 +1107,6 @@
     }
 
     var svg = qrPixSvg(payload);
-    if (!svg) {
-      avisar('Não consegui gerar o QR Code do PIX agora.', 'erro');
-      return;
-    }
 
     var corpo = blocoPix(svg, payload, valor);
     var titulo = Store.dados().config.nome || 'Pagamento PIX';
@@ -1109,6 +1118,7 @@
       janela.document.open();
       janela.document.write(
         '<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">' +
+        '<meta name="color-scheme" content="light dark">' +
         '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
         '<title>PIX — ' + esc(titulo) + '</title>' +
         '<style>' + estiloPix() + '</style></head>' +
@@ -1142,9 +1152,13 @@
         'font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}' +
       '.pix-pagina{max-width:420px;margin:0 auto;padding:24px 18px 40px;text-align:center}' +
       '.pix-titulo{font-size:1.2rem;margin:0 0 18px}' +
-      '.pix-qr{background:#fff;border:1px solid #e4e4e1;border-radius:14px;padding:14px;margin:0 0 14px}' +
-      '.pix-qr svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto}' +
+      ':root{color-scheme:light}' +
+      '.pix-qr{background:#fff;color-scheme:only light;border:1px solid #e4e4e1;border-radius:14px;padding:14px;margin:0 0 14px}' +
+      '.pix-qr svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto;' +
+        'color-scheme:only light;forced-color-adjust:none;-webkit-forced-color-adjust:none}' +
       '.pix-valor{font-size:1rem;margin:0 0 6px}' +
+      '.pix-aviso{font-size:.85rem;color:#8a4b12;background:#fdf3e3;border:1px solid #f0d9b5;' +
+        'border-radius:10px;padding:10px 12px;margin:0 0 14px;line-height:1.45;text-align:left}' +
       '.pix-dica{font-size:.85rem;color:#63605a;margin:0 0 16px;line-height:1.5}' +
       '.pix-rotulo{display:block;font-size:.8rem;font-weight:700;color:#63605a;margin:0 0 6px;text-align:left}' +
       '.pix-codigo{width:100%;font:inherit;font-size:.82rem;padding:10px;border:1px solid #d3d3ce;' +
@@ -1153,8 +1167,10 @@
         'border:1px solid #d3d3ce;border-radius:12px;background:transparent;color:#1c1b1a;cursor:pointer}' +
       '.btn:hover{background:#fafaf9}' +
       '@media (prefers-color-scheme: dark){' +
+        ':root{color-scheme:dark}' +
         'body{background:#131312;color:#f2f1ef}' +
         '.pix-qr{background:#fff;border-color:#302f2e}' +
+        '.pix-aviso{color:#f0c089;background:#3a2a14;border-color:#5c421d}' +
         '.pix-dica,.pix-rotulo{color:#b3b0a9}' +
         '.pix-codigo{background:#1c1c1b;color:#f2f1ef;border-color:#43423f}' +
         '.btn{border-color:#43423f;color:#f2f1ef}' +

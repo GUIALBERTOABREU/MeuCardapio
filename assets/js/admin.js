@@ -1250,9 +1250,18 @@
       location.reload();
     });
 
-    /* outra aba alterou o cardapio: recarrega a lista */
+    /* outra aba alterou o cardapio: recarrega a lista.
+       Nao recarrega por cima do que o dono esta digitando agora:
+       a chave PIX so existe neste navegador ate o primeiro envio,
+       entao uma aba do cardapio (que ainda nao tem o valor) salva
+       o estado sem ela, o evento chega aqui e a recarga apagaria
+       o campo no meio da digitacao. */
     window.addEventListener('storage', function (ev) {
       if (ev.key !== 'cardapio:data:v1' || !ev.newValue) return;
+
+      var foco = document.activeElement;
+      if (foco && foco.closest && foco.closest('#tabConfig')) return;
+
       Store.carregar();
       renderTudo();
       avisar('Cardápio atualizado de outra aba');
