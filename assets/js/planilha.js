@@ -83,11 +83,11 @@
        2 = A caminho / Pronto para retirada
        3 = Concluído    -1 = Cancelado (não usa a barra)
 
-     "tipo" limita um status a um tipo de pedido (entrega ou
-     retirada). As duas opções do passo 2 são mutuamente exclusivas:
-     um pedido de retirada não "saiu para entrega", e um pedido de
-     entrega não fica "pronto para retirada". Sem o campo, o status
-     vale para qualquer tipo.
+     "tipo" limita um status a um tipo de pedido. Só o "Saiu para
+     entrega" é exclusivo da entrega — um pedido de retirada não
+     "saiu para entrega". Já "Preparado" vale para os dois: na entrega
+     significa pronto, aguardando o entregador; na retirada, pronto
+     para retirar. Sem o campo, o status vale para qualquer tipo.
 
      A tela Acompanhar também entende sinônimos que o dono possa ter
      digitado à mão (ex.: "Entregue", "Saiu", "Em preparo") — esta
@@ -96,7 +96,7 @@
   var STATUS_PEDIDO = [
     { valor: 'Novo',              passo: 0 },
     { valor: 'Preparando',        passo: 1 },
-    { valor: 'Preparado',         passo: 2, tipo: 'retirada' },
+    { valor: 'Preparado',         passo: 2 },
     { valor: 'Saiu para entrega', passo: 2, tipo: 'entrega' },
     { valor: 'Concluído',         passo: 3 },
     { valor: 'Cancelado',         passo: -1 }
@@ -114,9 +114,9 @@
   /* Só os textos, na ordem em que aparecem no seletor do operador.
      Sem argumento devolve a lista inteira (é o que o filtro usa).
      Com "entrega" ou "retirada" devolve só os status que servem para
-     esse tipo — assim o operador não marca "Pronto para retirada" num
-     pedido de entrega. Tipo vazio/desconhecido devolve tudo, para não
-     esconder nenhum status sem querer. */
+     esse tipo — assim o operador não marca "Saiu para entrega" num
+     pedido que o cliente vai retirar. Tipo vazio/desconhecido devolve
+     tudo, para não esconder nenhum status sem querer. */
   function statusValores(tipo) {
     var temTipo = String(tipo == null ? '' : tipo).trim() !== '';
     return STATUS_PEDIDO.filter(function (s) {
@@ -865,6 +865,10 @@
             ok: true,
             pedido: json.pedido || alvo,
             status: json.status || 'Novo',
+            /* O Acompanhar usa o tipo para trocar "A caminho" por
+               "Pronto para retirada". Sem repassar, todo pedido de
+               retirada apareceria como se fosse entrega. */
+            tipo: json.tipo || '',
             encontrado: json.encontrado !== false
           });
         })

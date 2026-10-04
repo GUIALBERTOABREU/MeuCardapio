@@ -608,7 +608,12 @@ function alterarStatusPedido(pedido, novoStatus) {
 
   var valores = aba.getRange(2, 1, aba.getLastRow() - 1, cabecalho.length).getValues();
 
-  for (var i = 0; i < valores.length; i++) {
+  /* De trás para a frente, igual ao lerStatusPedido: se o mesmo número
+     aparecer duas vezes (impressão reprovada, linha copiada), vale a
+     mais recente — é o pedido que o cliente acabou de fazer. Vale
+     menos que o cliente conferir o número antes de gravar, mas cobre
+     o resto. */
+  for (var i = valores.length - 1; i >= 0; i--) {
     if (String(valores[i][colPedido - 1]).trim() === pedido) {
       aba.getRange(i + 2, colStatus).setValue(novoStatus);
       registrar('alterarStatus', 'Pedido ' + pedido + ' → ' + novoStatus);

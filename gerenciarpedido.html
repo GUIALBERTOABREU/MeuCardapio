@@ -8,7 +8,7 @@
   <meta name="description" content="Gerencie os pedidos da Pastelaria do CAÊ">
   <meta name="robots" content="noindex">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
-  <link rel="stylesheet" href="assets/css/style.css?v=20261004c">
+  <link rel="stylesheet" href="assets/css/style.css?v=20261004e">
   <style>
     .gerenciar-container {
       max-width: 1200px;
@@ -234,8 +234,8 @@
 
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-  <script src="assets/js/planilha-site.js?v=20261004c"></script>
-  <script src="assets/js/planilha.js?v=20261004c"></script>
+  <script src="assets/js/planilha-site.js?v=20261004e"></script>
+  <script src="assets/js/planilha.js?v=20261004e"></script>
   <script>
     (function () {
       'use strict';
@@ -255,9 +255,10 @@
         ? P.statusValores()
         : ['Novo', 'Preparando', 'Preparado', 'Saiu para entrega', 'Concluído', 'Cancelado'];
 
-      /* Status que fazem sentido para um pedido de certo tipo: entrega
-         não fica "pronto para retirada" e retirada não "saiu para
-         entrega". Tipo vazio/desconhecido mantém a lista inteira. */
+      /* Status que fazem sentido para um pedido de certo tipo: um
+         pedido de retirada não "saiu para entrega". "Preparado"
+         vale para os dois. Tipo vazio/desconhecido mantém a lista
+         inteira. */
       function statusDoPedido(tipo) {
         if (P && P.statusValores) return P.statusValores(tipo);
         return STATUS_VALIDOS;

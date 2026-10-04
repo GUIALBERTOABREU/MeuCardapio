@@ -25,6 +25,11 @@
      na mensagem e na planilha. Sem isso, a mensagem do WhatsApp e a
      linha gravada no Google sairiam com numeros diferentes. */
   var pedidoAtual = '';
+  /* Numero ja conferido livre na planilha, reservado em segundo plano
+     enquanto o cliente escolhe os itens. Vem vazio quando a planilha
+     nao esta configurada. Ver "numero do pedido sem colisao". */
+  var numeroReservado = '';
+  var reservandoNumero = false;
 
   /* =========================================================
      Utilitarios
@@ -561,6 +566,10 @@
     var partes = qtd + ' item(ns)';
     if (taxaAplicada() > 0) partes += ' + ' + moeda(taxaAplicada()) + ' entrega';
     el.cfSub.textContent = partes;
+
+    /* Assim que ha o que pedir, ja confere um numero de pedido livre em
+       segundo plano (ver "numero do pedido sem colisao"). */
+    if (qtd > 0) reservarNumero();
   }
 
   /* =========================================================
@@ -1280,6 +1289,63 @@
     return dia + '-' + sufixo;
   }
 
+  /* ---------- numero do pedido sem colisao ----------
+     O numero e DDMM + 3 digitos sorteados, num total de 900
+     combinacoes por dia. Num dia movimentado a repeticao e quase
+     certa: com 50 pedidos, ~75% de chance de ao menos dois cairem
+     no mesmo sufixo ( paradoxo do aniversario ). E o numero e o que
+     identifica o pedido — o cliente acompanha por ele, e o "Alterar
+     status" busca por ele. Com numero repetido, um cliente ve o
+     status do pedido do outro e o operador mexe na linha errada.
+
+     Nao da para conferir depois de gravar: o POST vai em no-cors
+     (o navegador nao deixa ler a resposta), entao uma recusa do
+     servidor seria silenciosa e o cliente ficaria olhando "pedido
+     nao encontrado" para sempre. Nao da para conferir no clique
+     tampoco, porque abrir o WhatsApp depende do gesto do usuario e
+     um bloqueador de pop-up barra a janela se a abertura atrasar.
+
+     Por isso a conferencia roda em segundo plano, enquanto o cliente
+     escolhe os itens: quando o carrinho ganha o primeiro item, um
+     numero ja livre e reservado. No clique ele ja esta conferido, e
+     a janela do WhatsApp abre do jeito normal. */
+
+  /* Sorteia ate "restam" vezes ate achar um numero que a planilha
+     ainda nao conhece. Qualquer duvida sobre a resposta (timeout,
+     rede, planilha fora do ar) libera o numero: e melhor gravar um
+     pedido com numero possivelmente repetido do que nao gravar. */
+  function numeroLivre(restam) {
+    var P = window.CardapioPlanilha;
+    var faltam = restam == null ? 5 : restam;
+    var tentativa = numeroPedido();
+
+    if (!P || !P.configurada() || faltam <= 0) return Promise.resolve(tentativa);
+
+    return P.statusDoPedido(tentativa).then(function (r) {
+      /* Reprova so quando a planilha respondeu de verdade e achou o
+         pedido. Qualquer outra coisa libera. */
+      if (r && r.ok === true && r.encontrado === true) return numeroLivre(faltam - 1);
+      return tentativa;
+    }, function () {
+      return tentativa;
+    });
+  }
+
+  function reservarNumero() {
+    if (numeroReservado || reservandoNumero) return;
+
+    var P = window.CardapioPlanilha;
+    if (!P || !P.configurada()) return;
+
+    reservandoNumero = true;
+    numeroLivre().then(function (livre) {
+      reservandoNumero = false;
+      if (livre) numeroReservado = livre;
+    }, function () {
+      reservandoNumero = false;
+    });
+  }
+
   function montarMensagem() {
     var cfg = Store.dados().config;
     var linhas = [];
@@ -1357,8 +1423,11 @@
     }
 
     /* Sorteia o numero do pedido uma unica vez. A mensagem do
-       WhatsApp e a linha da planilha usam este mesmo valor. */
-    pedidoAtual = numeroPedido();
+       WhatsApp e a linha da planilha usam este mesmo valor.
+       Prefere o numero que ja foi conferido contra a planilha em
+       segundo plano, e gasta a reserva (vale so para este pedido). */
+    pedidoAtual = numeroReservado || numeroPedido();
+    numeroReservado = '';
 
     var texto = encodeURIComponent(montarMensagem());
     var link = 'https://wa.me/' + cfg.whatsapp + '?text=' + texto;

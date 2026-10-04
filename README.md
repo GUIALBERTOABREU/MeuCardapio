@@ -234,9 +234,10 @@ Recebido  →  Em preparo  →  A caminho / Pronto para retirada  →  Concluíd
 
 O dono muda o status na tela `gerenciarpedido.html` (ou editando a coluna **Status** da
 aba `Pedidos`). O seletor da tela oferece só os status que servem para o tipo do pedido:
-`Novo`, `Preparando`, `Concluído` e `Cancelado` para todos, mais **`Saiu para entrega`**
-em pedidos de entrega e **`Preparado`** em pedidos de retirada — nunca os dois no mesmo
-pedido, porque um não sai para entrega e o outro não fica pronto para retirada. A coluna
+`Novo`, `Preparando`, `Preparado`, `Concluído` e `Cancelado` para todos, mais
+**`Saiu para entrega`** apenas em pedidos de entrega — um pedido de retirada não "saiu para
+entrega". Em pedido de entrega, `Preparado` é o passo intermediário "pronto, aguardando o
+entregador"; na retirada, é "pronto para retirar". A coluna
 **Status** na planilha é texto livre, então a página Acompanhar também entende sinônimos
 digitados à mão (`Em preparo`, `Saiu para entrega`, `Pronto para retirada`, `Concluído`,
 `Cancelado`).
