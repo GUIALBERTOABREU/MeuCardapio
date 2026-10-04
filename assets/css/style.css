@@ -3,6 +3,10 @@
    ============================================================= */
 
 :root {
+  /* Faz os controles nativos (calendario do type=date, dropdown do
+     select, barras de rolagem) seguirem o tema claro. */
+  color-scheme: light;
+
   --primaria: #8B1A1A;
   --primaria-escura: #6B1010;
   --primaria-clara: #FFF5F5;
@@ -55,6 +59,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
+
     --fundo: #131312;
     --superficie: #1c1c1b;
     --superficie-2: #232322;
@@ -644,7 +650,8 @@ main { padding: 24px 0 140px; min-height: 60vh; }
 
 input[type="text"], input[type="tel"], input[type="number"],
 input[type="email"], input[type="password"], input[type="search"],
-input[type="url"], select, textarea {
+input[type="url"], input[type="date"], input[type="time"],
+input[type="datetime-local"], select, textarea {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--borda-forte);

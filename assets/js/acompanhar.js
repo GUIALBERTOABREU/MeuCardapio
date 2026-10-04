@@ -70,6 +70,10 @@
   function chaveDoStatus(status) {
     var s = semAcento(status);
     if (!s || s === 'novo' || s === 'recebido' || s === 'aguardando') return 'novo';
+    /* "Preparado" (pronto para retirada) precisa vir ANTES do teste
+       generico de "prepar": senao caia em "preparo" e o cliente nunca
+       via o passo "Pronto para retirada". */
+    if (s.indexOf('preparad') >= 0) return 'pronto';
     if (s.indexOf('prepar') >= 0 || s === 'em andamento') return 'preparo';
     if (s.indexOf('caminho') >= 0 || s.indexOf('entrega') >= 0 || s.indexOf('saiu') >= 0) return 'caminho';
     if (s.indexOf('pronto') >= 0 || s.indexOf('retirada') >= 0) return 'pronto';

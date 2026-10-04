@@ -428,7 +428,7 @@
     }
     salvarCarrinho();
     render();
-    if (modoCheckout) renderModal();
+    atualizarModal();
   }
 
   /* Muda a quantidade de UMA linha do carrinho (pelo indice), porque
@@ -443,7 +443,7 @@
 
     salvarCarrinho();
     render();
-    if (modoCheckout) renderModal();
+    atualizarModal();
   }
 
   function addItem(id) {
@@ -553,12 +553,13 @@
   /* =========================================================
      Modal: carrinho e checkout
      ========================================================= */
-  function abrirModal(titulo, corpo, rodape) {
+  function abrirModal(titulo, corpo, rodape, semFoco) {
     el.modalTitulo.textContent = titulo;
     el.modalCorpo.innerHTML = corpo;
     el.modalRodape.innerHTML = rodape;
     el.overlay.classList.remove('oculto');
     document.body.classList.add('travado');
+    if (semFoco) return;
     var foco = el.modalCorpo.querySelector('input, textarea, button');
     if (foco) setTimeout(function () { foco.focus(); }, 60);
   }
@@ -570,9 +571,26 @@
     opcoesRascunho = null;
   }
 
-  function renderModal() {
+  function renderModal(semFoco) {
     if (modoCheckout) return renderCheckout();
-    renderCarrinho();
+    renderCarrinho(semFoco);
+  }
+
+  /* Redesenha o modal aberto (carrinho ou checkout) sem roubar o foco,
+     para os botoes +/- refletirem a nova quantidade na hora. */
+  function atualizarModal() {
+    if (!el.overlay || el.overlay.classList.contains('oculto')) return;
+    renderModal(true);
+  }
+
+  /* Depois do redesenho, devolve o foco ao botao +/- equivalente
+     (mesma linha/acao) para o teclado clicar varias vezes seguidas. */
+  function focarMaisMenos(acao, linha) {
+    if (!el.modalCorpo) return;
+    var botoes = el.modalCorpo.querySelectorAll('[data-' + acao + ']');
+    for (var i = 0; i < botoes.length; i++) {
+      if (botoes[i].getAttribute('data-linha') === linha) { botoes[i].focus(); return; }
+    }
   }
 
   /* =========================================================
@@ -778,14 +796,15 @@
     avisar(achado.item.nome + ' adicionado 🛒', 'ok');
   }
 
-  function renderCarrinho() {
+  function renderCarrinho(semFoco) {
     modoCheckout = false;
 
     if (!carrinho.length) {
       abrirModal('Seu pedido',
         '<div class="vazio"><span class="vazio-icone">🛒</span><p>Seu pedido está vazio.</p>' +
         '<p class="dica">Toque em “+ Adicionar” nos itens que quiser.</p></div>',
-        '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Continuar comprando</button>');
+        '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Continuar comprando</button>',
+        semFoco);
       return;
     }
 
@@ -834,7 +853,8 @@
     abrirModal('Seu pedido', corpo,
       '<button type="button" class="btn btn-primario btn-bloco" data-checkout' +
         (faltaMinimo > 0 ? ' disabled' : '') + '>Finalizar pedido no WhatsApp</button>' +
-      '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Continuar comprando</button>');
+      '<button type="button" class="btn btn-contorno btn-bloco" data-fechar>Continuar comprando</button>',
+      semFoco);
   }
 
   /* Quanto falta para bater o pedido minimo (0 se nao houver). */
@@ -1224,14 +1244,18 @@
 
       var inc = ev.target.closest('[data-inc]');
       if (inc) {
-        if (inc.hasAttribute('data-linha')) alterarLinha(Number(inc.getAttribute('data-linha')), 1);
+        var linhaInc = inc.hasAttribute('data-linha') ? inc.getAttribute('data-linha') : null;
+        if (linhaInc !== null) alterarLinha(Number(linhaInc), 1);
         else alterarQtd(inc.getAttribute('data-inc'), 1);
+        focarMaisMenos('inc', linhaInc);
         return;
       }
       var dec = ev.target.closest('[data-dec]');
       if (dec) {
-        if (dec.hasAttribute('data-linha')) alterarLinha(Number(dec.getAttribute('data-linha')), -1);
+        var linhaDec = dec.hasAttribute('data-linha') ? dec.getAttribute('data-linha') : null;
+        if (linhaDec !== null) alterarLinha(Number(linhaDec), -1);
         else alterarQtd(dec.getAttribute('data-dec'), -1);
+        focarMaisMenos('dec', linhaDec);
         return;
       }
     });

@@ -650,7 +650,10 @@
      antiga, entao a corrida e feita com uma bandera. */
   function lerPorFetch() {
     var chave = token();
-    var url = comParams(chave ? 'token=' + encodeURIComponent(chave) : '');
+    /* `v` fura o cache HTTP do Apps Script. Sem isso o navegador pode
+       devolver a resposta antiga (foi o que escondeu os bairros). */
+    var extra = 'v=' + Date.now() + (chave ? '&token=' + encodeURIComponent(chave) : '');
+    var url = comParams(extra);
 
     return new Promise(function (resolve) {
       var pronto = false;
@@ -665,7 +668,7 @@
         responder({ ok: false, erro: 'Tempo esgotado ao buscar o cardápio na planilha.' });
       }, 8000);
 
-      fetch(url, { credentials: 'omit', redirect: 'follow' })
+      fetch(url, { credentials: 'omit', redirect: 'follow', cache: 'no-store' })
         .then(function (resp) {
           if (!resp.ok) {
             responder({ ok: false, definido: true, erro: 'A planilha respondeu ' + resp.status + '.' });
@@ -697,7 +700,7 @@
             return;
           }
 
-          responder({ ok: true, menu: json.menu, config: json.config });
+          responder({ ok: true, menu: json.menu, config: json.config, bairros: json.bairros });
         })
         .catch(function (e) {
           responder({ ok: false, erro: 'Falha de rede ao ler a planilha: ' + (e && e.message ? e.message : e) });
@@ -713,7 +716,7 @@
     var nome = 'cardapioLer' + (++contadorCallback);
     var chave = token();
     var url = comParams(
-      'callback=' + nome + (chave ? '&token=' + encodeURIComponent(chave) : '')
+      'callback=' + nome + '&v=' + Date.now() + (chave ? '&token=' + encodeURIComponent(chave) : '')
     );
 
     return new Promise(function (resolve) {
@@ -738,7 +741,7 @@
           resolve({ ok: false, erro: (resposta && resposta.erro) || 'Resposta inesperada do script.' });
           return;
         }
-        resolve({ ok: true, menu: resposta.menu, config: resposta.config });
+        resolve({ ok: true, menu: resposta.menu, config: resposta.config, bairros: resposta.bairros });
       };
 
       script.onerror = function () {
@@ -767,7 +770,7 @@
     if (!alvo) return Promise.resolve({ ok: false, erro: 'Informe o número do pedido.' });
 
     var chave = token();
-    var extra = 'pedido=' + encodeURIComponent(alvo) +
+    var extra = 'pedido=' + encodeURIComponent(alvo) + '&v=' + Date.now() +
       (chave ? '&token=' + encodeURIComponent(chave) : '');
     var url = comParams(extra);
 
@@ -784,7 +787,7 @@
         responder({ ok: false, erro: 'Tempo esgotado ao consultar o pedido.' });
       }, 8000);
 
-      fetch(url, { credentials: 'omit', redirect: 'follow' })
+      fetch(url, { credentials: 'omit', redirect: 'follow', cache: 'no-store' })
         .then(function (resp) {
           if (!resp.ok) {
             responder({ ok: false, definido: true, erro: 'A planilha respondeu ' + resp.status + '.' });
@@ -1063,7 +1066,13 @@
   function lerPedidos() {
     if (!configurada()) return Promise.reject(new Error('Planilha não configurada.'));
 
-    var url = comParams('');
+    var chave = token();
+    /* `pedidos=1` é o que faz o script devolver a lista em vez do
+       cardápio. Sem esse parâmetro a página recebia o menu e a lista
+       saía sempre vazia. O `v` fura o cache e o token abre a
+       listagem (que traz nome e endereço do cliente). */
+    var extra = 'pedidos=1&v=' + Date.now() + (chave ? '&token=' + encodeURIComponent(chave) : '');
+    var url = comParams(extra);
 
     return new Promise(function (resolve) {
       var pronto = false;
@@ -1078,7 +1087,7 @@
         responder({ ok: false, erro: 'Tempo esgotado ao buscar pedidos.' });
       }, 8000);
 
-      fetch(url, { credentials: 'omit', redirect: 'follow' })
+      fetch(url, { credentials: 'omit', redirect: 'follow', cache: 'no-store' })
         .then(function (resp) {
           if (!resp.ok) {
             responder({ ok: false, definido: true, erro: 'A planilha respondeu ' + resp.status + '.' });

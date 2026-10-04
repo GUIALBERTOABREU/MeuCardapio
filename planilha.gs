@@ -201,8 +201,14 @@ function doGet(e) {
     return responderLeia(lerStatusPedido(parametro.pedido));
   }
 
-  /* Lista de pedidos para a página Gerenciar Pedidos. */
+  /* Lista de pedidos para a página Gerenciar Pedidos.
+     Aqui o token É exigido: a listagem traz nome, endereço e
+     observações de cada cliente, e o doGet não tinha como distinguir
+     o dono de um curioso que achasse a URL. */
   if (parametro.pedidos) {
+    if (TOKEN && parametro.token !== TOKEN) {
+      return responderLeia({ ok: false, erro: 'Token inválido.' });
+    }
     return responderLeia(lerPedidos());
   }
 

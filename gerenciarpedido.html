@@ -216,11 +216,13 @@
         <label for="filtroStatus">Filtrar por status</label>
         <select id="filtroStatus">
           <option value="">Todos os status</option>
+          <option value="Novo">Novo</option>
           <option value="Aguardando">Aguardando</option>
           <option value="Preparando">Preparando</option>
           <option value="Preparado">Preparado</option>
           <option value="Saiu para entrega">Saiu para entrega</option>
           <option value="Entregue">Entregue</option>
+          <option value="Cancelado">Cancelado</option>
         </select>
       </div>
       <button type="button" class="btn btn-contorno" id="btnLimparFiltros">Limpar filtros</button>
@@ -250,7 +252,7 @@
       var pedidos = [];
       var temporizador = null;
 
-      var STATUS_VALIDOS = ['Aguardando', 'Preparando', 'Preparado', 'Saiu para entrega', 'Entregue'];
+      var STATUS_VALIDOS = ['Novo', 'Aguardando', 'Preparando', 'Preparado', 'Saiu para entrega', 'Entregue', 'Cancelado'];
 
       function $(sel) { return document.querySelector(sel); }
 
@@ -270,14 +272,31 @@
         });
       }
 
-      function dataHora(texto) {
-        if (!texto) return '';
-        try {
-          var d = new Date(texto);
-          return d.toLocaleDateString('pt-BR') + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        } catch (e) {
-          return texto;
-        }
+      /* O Sheets devolve a data como Date em texto longo. Para exibir
+         encurtamos; para filtrar comparamos dia a dia. Aceita
+         dd/mm/aaaa, aaaa-mm-dd e o texto nativo do Sheets. */
+      function paraData(texto) {
+        var s = String(texto == null ? '' : texto).trim();
+        if (!s) return null;
+        var br = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s);
+        if (br) return new Date(Number(br[3]), Number(br[2]) - 1, Number(br[1]));
+        var iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+        if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
+        var d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      function dataCurta(texto) {
+        var d = paraData(texto);
+        return d ? d.toLocaleDateString('pt-BR') : String(texto == null ? '' : texto);
+      }
+
+      function horaCurta(texto) {
+        var s = String(texto == null ? '' : texto).trim();
+        if (!s) return '';
+        var hm = /(\d{1,2}):(\d{2})/.exec(s);
+        if (hm) return ('0' + hm[1]).slice(-2) + ':' + hm[2];
+        return s;
       }
 
       function classeStatus(status) {
@@ -309,41 +328,81 @@
         }, 2400);
       }
 
-      function buscarPedidos() {
+      /* Troca o conteudo da lista preservando a rolagem, para a tela
+         nao "pular" para o topo a cada atualizacao. */
+      function pintarLista(html) {
+        var rolagem = window.scrollY;
+        el.pedidosLista.innerHTML = html;
+        if (rolagem) window.scrollTo(0, rolagem);
+      }
+
+      /* `silencioso` = atualizacao automatica: mantem a lista atual na
+         tela em vez de mostrar "Buscando pedidos..." a cada 30 s. */
+      function buscarPedidos(silencioso) {
         if (!P || !P.configurada()) {
-          el.pedidosLista.innerHTML = '<div class="pedido-vazio"><span class="pedido-vazio-icone">⚠️</span><p>Planilha não configurada. Conecte o Google Sheets primeiro.</p></div>';
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">⚠️</span><p>Planilha não configurada. Conecte o Google Sheets primeiro.</p></div>');
           return;
         }
 
-        el.pedidosLista.innerHTML = '<div class="pedido-vazio"><span class="pedido-vazio-icone">⏳</span><p>Buscando pedidos...</p></div>';
+        if (!silencioso) {
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">⏳</span><p>Buscando pedidos...</p></div>');
+        }
 
-        P.lerPedidos().then(function (lista) {
-          pedidos = lista || [];
+        P.lerPedidos().then(function (resp) {
+          if (!resp || resp.ok !== true) {
+            pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">❌</span><p>' +
+              esc((resp && resp.erro) || 'Não foi possível carregar os pedidos.') + '</p></div>');
+            return;
+          }
+          pedidos = resp.pedidos || [];
           renderPedidos();
           el.atualizadoEm.textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
         }).catch(function (erro) {
-          el.pedidosLista.innerHTML = '<div class="pedido-vazio"><span class="pedido-vazio-icone">❌</span><p>Erro ao buscar pedidos: ' + esc(erro.message) + '</p></div>';
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">❌</span><p>Erro ao buscar pedidos: ' + esc(erro && erro.message ? erro.message : erro) + '</p></div>');
         });
+      }
+
+      /* Atualizacao automatica: nao interrompe quem esta mexendo na
+         lista (ex.: escolhendo um status) nem rouba o foco. */
+      function atualizarAutomatico() {
+        var ativo = document.activeElement;
+        if (ativo && el.pedidosLista.contains(ativo)) return;
+        buscarPedidos(true);
       }
 
       function renderPedidos() {
         var filtroData = el.filtroData.value;
         var filtroStatus = el.filtroStatus.value;
 
+        var alvoData = filtroData ? new Date(filtroData + 'T00:00:00') : null;
+
         var filtrados = pedidos.filter(function (p) {
-          if (filtroData && p.data !== filtroData) return false;
+          if (alvoData) {
+            var d = paraData(p.data);
+            if (!d || d.getFullYear() !== alvoData.getFullYear() ||
+                d.getMonth() !== alvoData.getMonth() ||
+                d.getDate() !== alvoData.getDate()) return false;
+          }
           if (filtroStatus && p.status !== filtroStatus) return false;
           return true;
         });
 
         if (!filtrados.length) {
-          el.pedidosLista.innerHTML = '<div class="pedido-vazio"><span class="pedido-vazio-icone">📋</span><p>Nenhum pedido encontrado.</p></div>';
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">📋</span><p>Nenhum pedido encontrado.</p></div>');
           return;
         }
 
-        el.pedidosLista.innerHTML = filtrados.map(function (p) {
-          var itensHtml = (p.itens || []).map(function (i) {
-            return '<li>' + i.quantidade + 'x ' + esc(i.nome) + ' — ' + moeda(i.quantidade * i.precoUnitario) + '</li>';
+        pintarLista(filtrados.map(function (p) {
+          /* O script devolve "Itens do pedido" como texto
+             ("1x X-Burguer (18.9) | ..."). Aceitamos também array,
+             caso o script passe a mandar estruturado. */
+          var itensLista = Array.isArray(p.itens)
+            ? p.itens.map(function (i) {
+                return i.quantidade + 'x ' + i.nome + ' — ' + moeda(i.quantidade * i.precoUnitario);
+              })
+            : String(p.itens || '').split(' | ').filter(Boolean);
+          var itensHtml = itensLista.map(function (linha) {
+            return '<li>' + esc(linha) + '</li>';
           }).join('');
 
           var opcoesStatus = STATUS_VALIDOS.map(function (s) {
@@ -355,8 +414,8 @@
             '<div class="pedido-info">' +
               '<div class="pedido-numero">Pedido #' + esc(p.pedido) + '</div>' +
               '<div class="pedido-detalhes">' +
-                '<div><strong>Data</strong>' + esc(p.data) + '</div>' +
-                '<div><strong>Hora</strong>' + esc(p.hora) + '</div>' +
+                '<div><strong>Data</strong>' + esc(dataCurta(p.data)) + '</div>' +
+                '<div><strong>Hora</strong>' + esc(horaCurta(p.hora)) + '</div>' +
                 '<div><strong>Cliente</strong>' + esc(p.cliente) + '</div>' +
                 '<div><strong>Tipo</strong>' + esc(p.tipo) + '</div>' +
                 '<div><strong>Pagamento</strong>' + esc(p.pagamento) + '</div>' +
@@ -375,7 +434,7 @@
               '</select>' +
             '</div>' +
           '</div>';
-        }).join('');
+        }).join(''));
       }
 
       function alterarStatus(pedido, novoStatus) {
@@ -386,7 +445,7 @@
 
         P.alterarStatusPedido(pedido, novoStatus).then(function () {
           avisar('Status do pedido #' + pedido + ' alterado para ' + novoStatus, 'ok');
-          buscarPedidos();
+          buscarPedidos(true);
         }).catch(function (erro) {
           avisar('Erro ao alterar status: ' + erro.message, 'erro');
         });
@@ -402,7 +461,7 @@
           renderPedidos();
         });
 
-        el.btnAtualizar.addEventListener('click', buscarPedidos);
+        el.btnAtualizar.addEventListener('click', function () { buscarPedidos(); });
 
         el.pedidosLista.addEventListener('change', function (ev) {
           var select = ev.target.closest('[data-status-pedido]');
@@ -427,8 +486,8 @@
         ligarEventos();
         buscarPedidos();
 
-        // Atualizar automaticamente a cada 30 segundos
-        temporizador = setInterval(buscarPedidos, 30000);
+        // Atualizar automaticamente a cada 30 segundos (sem interromper quem mexe na lista)
+        temporizador = setInterval(atualizarAutomatico, 30000);
       }
 
       if (document.readyState === 'loading') {
