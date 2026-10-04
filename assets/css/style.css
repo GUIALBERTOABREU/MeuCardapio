@@ -30,6 +30,13 @@
   --sucesso-texto: #1c6b38;
   --sucesso-fundo: rgba(47, 143, 78, .13);
   --sucesso-borda: rgba(47, 143, 78, .3);
+  /* Passo ATUAL do Acompanhar: verde claro, para o cliente ver em
+     que etapa o pedido esta sem confundir com as etapas ja
+     cumpridas (que usam o --sucesso cheio, com texto branco).
+     O texto e escuro porque o fundo e claro — e o que passa em
+     4.5:1 nos dois temas. */
+  --sucesso-claro: #d6ecdd;
+  --sucesso-claro-texto: #0e3a20;
   --aviso: #8a6407;
   --perigo: #c92a2a;
   --perigo-texto: #a01f1f;
@@ -78,6 +85,10 @@
     --perigo-texto: #ff8787;
     --sucesso-fundo: rgba(47, 143, 78, .18);
     --sucesso-borda: rgba(47, 143, 78, .38);
+    /* No escuro o verde claro continua claro (e nao um verde
+       murado): e o que faz o passo atual destacar do fundo. */
+    --sucesso-claro: #a8d9ba;
+    --sucesso-claro-texto: #0e3a20;
     --perigo-fundo: rgba(201, 42, 42, .18);
     --perigo-borda: rgba(201, 42, 42, .38);
     --sombra: 0 1px 2px rgba(0, 0, 0, .4), 0 6px 20px rgba(0, 0, 0, .35);
@@ -1145,8 +1156,14 @@ textarea { resize: vertical; min-height: 76px; }
 .ac-passo-feito .ac-bolinha {
   background: var(--sucesso); border-color: var(--sucesso); color: #fff;
 }
+/* O passo atual usa um verde CLARO, e nao o verde cheio dos passos
+   cumpridos: os dois ficam na familia do verde, mas o tom claro
+   mostra "o pedido esta aqui agora" sem parecer ja concluido. O
+   anel verde reforca a borda contra o fundo escuro. */
 .ac-passo-atual .ac-bolinha {
-  background: var(--primaria); border-color: var(--primaria); color: #fff;
+  background: var(--sucesso-claro);
+  border-color: var(--sucesso);
+  color: var(--sucesso-claro-texto);
 }
 .ac-passo-texto { display: flex; flex-direction: column; }
 .ac-passo-texto small { color: var(--texto-suave); }

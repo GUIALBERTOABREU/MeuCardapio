@@ -249,6 +249,50 @@ dele.
 A consulta é uma leitura pública e leve (`?pedido=0310-117`): devolve só o status, sem
 arrastar o cardápio inteiro, porque a página pergunta de novo de tempo em tempo.
 
+### As cores da linha do tempo
+
+Cada bolinha diz em que etapa o pedido está, e o tom diferencia as três situações:
+
+| Bolinha | Cor | Quer dizer |
+|---|---|---|
+| verde cheio `#1C6B38`, com ✓ | `--sucesso` | o pedido **já passou** por aqui |
+| **verde claro** `#A8D9BA` (tema claro `#D6ECDD`), com anel verde | `--sucesso-claro` | o pedido está **aqui agora** |
+| cinza `#232322` | `--superficie-2` | etapa ainda **não chegou** |
+
+O passo atual é verde claro, e não o verde cheio dos concluídos, para o cliente distinguir
+"estou aqui" de "já passou" sem precisar ler o texto. Como o fundo é claro, o número dentro
+da bolinha é **escuro** (`--sucesso-claro-texto`, `#0E3A20`): o contraste fica em 8:1, bem
+acima dos 4.5:1 da WCAG AA. Os dois verdes pertencem à mesma família, então a linha do tempo
+continua legível como um caminho só.
+
+### Por que o número do pedido nunca repete
+
+O número é `DDMM` + 3 dígitos sorteados (`0410-573`), o que dá 900 combinações por dia.
+Num dia movimentado a repetição seria quase certa: com 50 pedidos, ~75% de chance de ao menos
+dois caírem no mesmo sufixo (paradoxo do aniversário). E o número é o que identifica o pedido
+— o cliente acompanha por ele, e o *Alterar status* busca por ele. Com número repetido, um
+cliente veria o status do pedido do outro e o operador mudaria a linha errada.
+
+A conferência acontece **em segundo plano**, enquanto o cliente escolhe os itens: quando o
+carrinho ganha o primeiro item, `reservarNumero()` sorteia um número e pergunta à planilha
+(`?pedido=...`) se ele já existe; se existir, sorteia outro, até 5 vezes. No clique em
+Finalizar o número já está conferido, então a janela do WhatsApp abre do jeito normal.
+
+Não dá para conferir **depois** de gravar: o POST vai em `mode: 'no-cors'` (o Apps Script não
+devolve cabeçalho de CORS), então o navegador não lê a resposta. Uma recusa do servidor seria
+silenciosa e o cliente ficaria olhando "pedido não encontrado" para sempre. Também não dá para
+conferir no clique, porque abrir o WhatsApp depende do gesto do usuário e um bloqueador de
+pop-up barra a janela se a abertura atrasar. Daí a reserva antecipada.
+
+Como rede caída não pode travar o cliente, qualquer dúvida sobre a resposta (timeout, erro
+de rede, planilha fora do ar) **libera** o número: é melhor gravar um pedido com número
+possivelmente repetido do que não gravar.
+
+No servidor há uma segunda camada: `lerStatusPedido` e `alterarStatusPedido` varrem a aba de
+baixo para cima e valem a linha **mais recente** quando o número aparece duas vezes — o pedido
+que o cliente acabou de fazer é o último. Vale menos que conferir antes de gravar, mas cobre o
+resto.
+
 ## Acessibilidade e instalação
 
 Sem dependências, sem requisições externas, sem rastreamento. Lighthouse das duas
