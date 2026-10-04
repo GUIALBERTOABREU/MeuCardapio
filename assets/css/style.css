@@ -667,6 +667,13 @@ main { padding: 24px 0 140px; min-height: 60vh; }
   forced-color-adjust: none;
   -webkit-forced-color-adjust: none;
 }
+.pix-qr img {
+  display: block; width: 100%; max-width: 280px; height: auto; margin: 0 auto;
+  /* A imagem e gerada em preto no branco. Nao deixar o navegador
+     suavizar demais ao ampliar (mantem os modulos nitidos). */
+  image-rendering: pixelated;
+  -ms-interpolation-mode: nearest-neighbor;
+}
 .pix-valor { margin: 12px 0 2px; font-size: .95rem; }
 .pix-aviso {
   margin: 0 0 10px;

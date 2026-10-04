@@ -1027,7 +1027,7 @@
     return p + crc16Pix(p);
   }
 
-  function qrPixSvg(payload) {
+  function qrPixHtml(payload) {
     if (!window.qrcode) {
       if (window.console && console.warn) {
         console.warn('[cardapio] QR PIX: biblioteca de QR nao carregada (qrcode.min.js). ' +
@@ -1039,8 +1039,24 @@
       var qr = window.qrcode(0, 'M');
       qr.addData(payload);
       qr.make();
+
+      /* O QR sai como IMAGEM (raster), nao como SVG inline. Motivo: o
+         "modo escuro automatico" (force dark) de alguns navegadores /
+         WebView recolore o SVG e escurece o branco, deixando os modulos
+         pretos sobre fundo escuro (ilegivel). Imagens ficam de fora
+         dessa inversao. Tambem desenhamos no tamanho proximo ao exibido
+         para nao ampliar demais. */
+      if (qr.createDataURL) {
+        var n = qr.getModuleCount();
+        var cell = Math.max(3, Math.floor(280 / (n + 8)));
+        var margin = cell * 4;
+        var url = qr.createDataURL(cell, margin);
+        return '<img class="pix-qr-img" src="' + url + '" alt="">';
+      }
+
+      /* Reserva para uma lib sem createDataURL: usa o SVG. */
       var svg = qr.createSvgTag({ cellSize: 6, margin: 2 });
-      /* O rotulo acessivel fica no <div> que envolve o SVG. */
+      /* O rotulo acessivel fica no <div> que envolve o QR. */
       return svg.replace('<svg ', '<svg aria-hidden="true" focusable="false" ');
     } catch (e) {
       if (window.console && console.warn) console.warn('[cardapio] QR PIX:', e && e.message);
@@ -1048,19 +1064,19 @@
     }
   }
 
-  function blocoPix(svg, payload, valor) {
+  function blocoPix(qrHtml, payload, valor) {
     /* O QR e so um atalho: sem a biblioteca (ou se a geracao falhar)
        o "copia e cola" abaixo continua sendo um PIX valido. Por isso
        o bloco nunca fica so com o aviso de erro. */
-    var qr = svg
+    var bloco = qrHtml
       ? '<div class="pix-qr" role="img" aria-label="QR Code PIX para pagar ' + esc(moeda(valor)) + '">' +
-          svg +
+          qrHtml +
         '</div>'
       : '<p class="pix-aviso">Não foi possível desenhar o QR Code agora, mas o código abaixo funciona igual: ' +
         'abra o aplicativo do banco em PIX e use o “copia e cola”.</p>';
 
     return '' +
-      qr +
+      bloco +
       '<p class="pix-valor">Valor: <strong>' + esc(moeda(valor)) + '</strong></p>' +
       '<p class="pix-dica">Abra o aplicativo do seu banco, entre em PIX e aponte a câmera para o código. ' +
         'Se preferir, use o “copia e cola”.</p>' +
@@ -1106,9 +1122,9 @@
       return;
     }
 
-    var svg = qrPixSvg(payload);
+    var qrHtml = qrPixHtml(payload);
 
-    var corpo = blocoPix(svg, payload, valor);
+    var corpo = blocoPix(qrHtml, payload, valor);
     var titulo = Store.dados().config.nome || 'Pagamento PIX';
 
     var janela = null;
@@ -1156,6 +1172,8 @@
       '.pix-qr{background:#fff;color-scheme:only light;border:1px solid #e4e4e1;border-radius:14px;padding:14px;margin:0 0 14px}' +
       '.pix-qr svg{display:block;width:100%;max-width:300px;height:auto;margin:0 auto;' +
         'color-scheme:only light;forced-color-adjust:none;-webkit-forced-color-adjust:none}' +
+      '.pix-qr img{display:block;width:100%;max-width:300px;height:auto;margin:0 auto;' +
+        'image-rendering:pixelated;-ms-interpolation-mode:nearest-neighbor}' +
       '.pix-valor{font-size:1rem;margin:0 0 6px}' +
       '.pix-aviso{font-size:.85rem;color:#8a4b12;background:#fdf3e3;border:1px solid #f0d9b5;' +
         'border-radius:10px;padding:10px 12px;margin:0 0 14px;line-height:1.45;text-align:left}' +
