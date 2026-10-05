@@ -4,11 +4,11 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#8B1A1A">
-  <title>Gerenciar Pedidos — Pastelaria do CAÊ</title>
-  <meta name="description" content="Gerencie os pedidos da Pastelaria do CAÊ">
+  <title>Gerenciar Pedidos</title>
+  <meta name="description" content="Painel para ver e mudar o status dos pedidos.">
   <meta name="robots" content="noindex">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
-  <link rel="stylesheet" href="assets/css/style.css?v=20261004g">
+  <link rel="stylesheet" href="assets/css/style.css?v=20261004h">
   <style>
     .gerenciar-container {
       max-width: 1200px;
@@ -197,7 +197,7 @@
           <div class="marca-logo" aria-hidden="true">📋</div>
           <div class="marca-texto">
             <h1 class="marca-nome">Gerenciar Pedidos</h1>
-            <p class="marca-sub">Pastelaria do CAÊ</p>
+            <p class="marca-sub" id="marcaSub">Painel de pedidos</p>
           </div>
         </div>
         <a class="btn btn-contorno btn-sm" href="index.html">← Voltar ao cardápio</a>
@@ -234,8 +234,8 @@
 
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-  <script src="assets/js/planilha-site.js?v=20261004g"></script>
-  <script src="assets/js/planilha.js?v=20261004g"></script>
+  <script src="assets/js/planilha-site.js?v=20261004h"></script>
+  <script src="assets/js/planilha.js?v=20261004h"></script>
   <script>
     (function () {
       'use strict';
@@ -262,6 +262,26 @@
       function statusDoPedido(tipo) {
         if (P && P.statusValores) return P.statusValores(tipo);
         return STATUS_VALIDOS;
+      }
+
+      /* A marca vem do cardapio que este navegador ja guardou, e nao
+         de um nome escrito aqui: escrito no HTML, o nome da lanchonete
+         envelhece e passa a mostrar o nome antigo em serio. O cache e o
+         mesmo `cardapio:data:v1` que a pagina Acompanhar le, e por
+         isso nao custa nenhuma requisição a mais. Sem cache (navegador
+         novo, aba anônima) o subtítulo fica no texto genérico do HTML. */
+      function pintarMarca() {
+        var alvo = document.getElementById('marcaSub');
+        if (!alvo) return;
+
+        try {
+          var bruto = localStorage.getItem('cardapio:data:v1');
+          var nome = bruto && (JSON.parse(bruto).config || {}).nome;
+          if (nome) {
+            alvo.textContent = String(nome);
+            document.title = 'Gerenciar Pedidos - ' + nome;
+          }
+        } catch (e) { /* modo restrito: fica o texto generico */ }
       }
 
       function $(sel) { return document.querySelector(sel); }
@@ -505,6 +525,7 @@
         };
 
         montarFiltroStatus();
+        pintarMarca();
         ligarEventos();
         buscarPedidos();
 

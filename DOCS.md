@@ -75,7 +75,7 @@ cardapio/
 
 | Campo | Valor |
 |-------|-------|
-| **Nome** | Pastelaria do CAÊ |
+| **Nome** | Ambuger do Ze |
 | **Descrição** | Lanches, porções e bebidas geladas |
 | **WhatsApp** | 5598988815481 |
 | **Taxa de entrega** | R$ 7,00 |
