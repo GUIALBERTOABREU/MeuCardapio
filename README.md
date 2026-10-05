@@ -35,6 +35,9 @@ internet, não para divulgar.
 | --- | --- | --- |
 | `index.html` | cliente | Cardápio, busca, carrinho e envio do pedido |
 | `admin.html` | dono | Editar itens, preços, categorias e configurações |
+| `gerenciar.html` | dono | Ver a lista de pedidos e mudar o status de cada um |
+| `acompanhar.html` | cliente | Acompanhar o andamento do próprio pedido |
+| `pix.html` | cliente | Pagamento por PIX |
 
 ## Entrar no painel
 
@@ -232,7 +235,7 @@ cada 15 segundos e desenha a linha do tempo:
 Recebido  →  Em preparo  →  A caminho / Pronto para retirada  →  Concluído
 ```
 
-O dono muda o status na tela `gerenciarpedido.html` (ou editando a coluna **Status** da
+O dono muda o status na tela `gerenciar.html` (ou editando a coluna **Status** da
 aba `Pedidos`). O seletor da tela oferece só os status que servem para o tipo do pedido:
 `Novo`, `Preparando`, `Preparado`, `Concluído` e `Cancelado` para todos, mais
 **`Saiu para entrega`** apenas em pedidos de entrega — um pedido de retirada não "saiu para
@@ -794,6 +797,8 @@ cardapio/
 ├── index.html            cardápio do cliente
 ├── acompanhar.html       acompanhamento do pedido (link da faixa 🛵)
 ├── admin.html            painel do dono
+├── gerenciar.html        lista de pedidos e status (botão "Pedidos" no painel)
+├── pix.html              pagamento por PIX
 ├── cardapio.json         exemplo embutido / backup — a página não o busca mais
 ├── planilha.gs           script do Google Sheets (cole no Google, não no site)
 ├── .gitignore            mantém tools/, novas_img/ e cópias fora da publicação
