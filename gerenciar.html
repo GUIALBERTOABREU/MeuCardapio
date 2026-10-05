@@ -8,7 +8,7 @@
   <meta name="description" content="Painel para ver e mudar o status dos pedidos.">
   <meta name="robots" content="noindex">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📋</text></svg>">
-  <link rel="stylesheet" href="assets/css/style.css?v=20261004i">
+  <link rel="stylesheet" href="assets/css/style.css?v=20261004m">
   <style>
     .gerenciar-container {
       max-width: 1200px;
@@ -234,8 +234,8 @@
 
   <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
-  <script src="assets/js/planilha-site.js?v=20261004i"></script>
-  <script src="assets/js/planilha.js?v=20261004i"></script>
+  <script src="assets/js/planilha-site.js?v=20261004m"></script>
+  <script src="assets/js/planilha.js?v=20261004m"></script>
   <script>
     (function () {
       'use strict';
@@ -474,11 +474,23 @@
           return;
         }
 
-        P.alterarStatusPedido(pedido, novoStatus).then(function () {
+        P.alterarStatusPedido(pedido, novoStatus).then(function (r) {
+          /* `postarLendo` RESOLVE com {ok:false, erro} quando o script
+             recusa — ele não rejeita. Antes disto o `.then` ignorava a
+             resposta e mostrava o "ok" sempre: token errado, script
+             desatualizado ou aba travada viravam "alterado para Em
+             preparo", o dono preparava o lanche e o cliente seguia
+             vendo "Recebido" na tela Acompanhar. */
+          if (!r || r.ok !== true) {
+            avisar('NÃO ALTEROU: ' + ((r && r.erro) || 'o script não respondeu.'), 'erro');
+            buscarPedidos(true);
+            return;
+          }
+
           avisar('Status do pedido #' + pedido + ' alterado para ' + novoStatus, 'ok');
           buscarPedidos(true);
         }).catch(function (erro) {
-          avisar('Erro ao alterar status: ' + erro.message, 'erro');
+          avisar('NÃO ALTEROU: ' + erro.message, 'erro');
         });
       }
 

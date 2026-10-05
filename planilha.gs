@@ -66,6 +66,114 @@ var CAMPOS_CONFIG = [
   'chavePix', 'pixCidade'
 ];
 
+/* A coluna A e escrita a mao e o dono digita o rotulo que le na tela
+   ("Chave PIX", "Cidade do recebedor"), nao o nome interno. Antes isso
+   era um silencio: a linha ficava na planilha, o script nao a
+   reconhecia e o PIX simplesmente nao existia. Agora a comparacao
+   ignora maiuscula, acento, espaco e pontuacao, e APELIDO_CONFIG amarra
+   o rotulo ao campo certo. O nome interno continua valendo: e a forma
+   como o painel escreve. */
+var APELIDO_CONFIG = {
+  chave: 'chavePix',
+  chavepix: 'chavePix',
+  chavealeatoria: 'chavePix',
+  pix: 'chavePix',
+  pixchave: 'chavePix',
+  cidade: 'pixCidade',
+  pixcidade: 'pixCidade',
+  estadorecebedor: 'pixCidade',
+  cidaderecebedor: 'pixCidade',
+  cidadedorecebedor: 'pixCidade'
+};
+
+/* Rotulos da aba Config que o script nao reconheceu. Vao na resposta da
+   leitura para o painel avisar, em vez de a linha sumir sem ninguem
+   perceber. So os NOMES: os valores das linhas nao reconhecidas nao
+   sao devolvidos. */
+var CHAVES_IGNORADAS = [];
+
+/* Linhas que o painel grava de proposito e que NAO transportam nada
+   para o cardapio (sao o rastro de qual URL e qual token publicaram, e
+   a data da publicacao). Elas entram na conta de "nao reconhecida" sem
+   gerar aviso: sao esperadas, nao erro de digitacao. Sem esta lista o
+   painel acusaria a propria Config a cada "Buscar da planilha". */
+var LINHAS_AUDITORIA = ['url-do-web-app', 'token-do-script', 'publicado_em'];
+
+/* "Chave PIX" e "chave_pix" precisam cair no mesmo nome. */
+function semAcentoConfig(txt) {
+  return String(txt == null ? '' : txt).normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function chaveConfigNormalizada(chave) {
+  return semAcentoConfig(chave).toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/* Devolve o campo de Config que a linha escrita representa, ou '' se
+   nao for nenhum. */
+function campoConfigDe(chave) {
+  var escrita = String(chave == null ? '' : chave).trim();
+  if (!escrita) return '';
+  if (CAMPOS_CONFIG.indexOf(escrita) >= 0) return escrita;
+
+  var normal = chaveConfigNormalizada(escrita);
+  if (!normal) return '';
+
+  for (var i = 0; i < CAMPOS_CONFIG.length; i++) {
+    if (chaveConfigNormalizada(CAMPOS_CONFIG[i]) === normal) return CAMPOS_CONFIG[i];
+  }
+
+  return APELIDO_CONFIG[normal] || '';
+}
+
+/* Chave PIX de telefone e so digito: 55 + DDD + numero, sem "+", sem
+   espaco e sem hifen. O dono copia do app do banco, que mostra
+   "+55 98 98881-5481", e o QR saia invalido — parecia funcionar e
+   ninguem recebia. E-mail e chave aleatoria nunca entram nesta regra
+   porque tem letra. */
+function chavePixLimpa(valor) {
+  var s = String(valor == null ? '' : valor).trim();
+  if (!s) return '';
+  if (!/^\+?[0-9 ()./-]+$/.test(s)) return s;
+
+  var digitos = s.replace(/[^0-9]/g, '');
+  var n = digitos.length;
+
+  /* Com "+" (telefone com DDI) e nas Contagens 12, 13 e 14 (telefone
+     com DDI e CNPJ) nao ha duvida: pode limpar. */
+  if (s.indexOf('+') >= 0) return digitos;
+  if (n === 12 || n === 13 || n === 14) return digitos;
+
+  /* Onze digitos e ambiguo: pode ser CPF com pontuacao ou telefone sem
+     o +55. Limpar sem conferir trocaria uma chave por outra em
+     silencio — o pior jeito de errar. So limpa quando o digito
+     verificador diz que e CPF mesmo; no resto deixa o texto do dono
+     como esta. */
+  if (n === 11 && cpfValido(digitos)) return digitos;
+
+  return s;
+}
+
+/* CPF tem digito verificador. Serve para separar "CPF com ponto e
+   hifen" de "telefone sem o +55", que tambem tem onze digitos. */
+function cpfValido(digitos) {
+  var d = String(digitos || '');
+  if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
+
+  var soma = 0;
+  for (var i = 0; i < 9; i++) soma += Number(d.charAt(i)) * (10 - i);
+  var resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+  if (resto !== Number(d.charAt(9))) return false;
+
+  soma = 0;
+  for (var j = 0; j < 10; j++) soma += Number(d.charAt(j)) * (11 - j);
+  resto = (soma * 10) % 11;
+  if (resto === 10) resto = 0;
+
+  return resto === Number(d.charAt(10));
+}
+
 /* Aba de taxas por bairro: uma linha por bairro (Bairro, Taxa, Tempo,
    Ativo). Quando existe, o cliente escolhe o bairro no checkout e a
    taxa dele vence a taxa unica da aba Config. */
@@ -240,8 +348,17 @@ function doGet(e) {
   /* menu vazio e config null sao respostas legitimas: significam
      "a planilha existe mas ainda nao foi publicada". O navegador
      entende isso e mantem o que ja tinha. Bairros null (aba
-     inexistente) tambem nao apaga nada; lista vazia apaga. */
-  return responderLeia({ ok: true, menu: menu, config: config, bairros: bairros });
+     inexistente) tambem nao apaga nada; lista vazia apaga.
+     chavesIgnoradas sao os rotulos da aba Config que ficaram de fora
+     (so o nome, nunca o valor): e o que permite ao painel dizer que
+     ha linha sobrando em vez de fingir que esta tudo certo. */
+  return responderLeia({
+    ok: true,
+    menu: menu,
+    config: config,
+    bairros: bairros,
+    chavesIgnoradas: CHAVES_IGNORADAS
+  });
 }
 
 /* ------------------------------------------------------------------
@@ -423,8 +540,11 @@ function lerCardapio() {
 
 /**
  * Lê a aba Config (chave/valor) e devolve só os campos conhecidos.
- * Chave fora da lista é ignorada: se alguém digitar um título ou
- * deixar anotação na aba, ela não entra no cardápio.
+ * A coluna A aceita o nome interno ("chavePix") ou o rótulo que o dono
+ * le na tela ("Chave PIX", "Cidade do recebedor") — ver
+ * campoConfigDe. Chave que não corresponde a nenhum dos dois é
+ * ignorada, para uma anotação na aba não entrar no cardápio, mas o
+ * nome dela volta em CHAVES_IGNORADAS para o painel avisar.
  * Devolve null quando a aba não existe, para o navegador manter a
  * configuração que já tinha.
  */
@@ -432,15 +552,26 @@ function lerConfig() {
   var planilha = SpreadsheetApp.getActiveSpreadsheet();
   var aba = planilha.getSheetByName(ABA_CONFIG);
 
+  CHAVES_IGNORADAS = [];
+
   if (!aba || aba.getLastRow() < 2) return null;
 
   var valores = aba.getRange(2, 1, aba.getLastRow() - 1, 2).getValues();
   var saida = {};
 
   for (var i = 0; i < valores.length; i++) {
-    var chave = String(valores[i][0] || '').trim();
-    if (CAMPOS_CONFIG.indexOf(chave) < 0) continue;
-    saida[chave] = valores[i][1];
+    var escrita = String(valores[i][0] || '').trim();
+    if (!escrita) continue;
+
+    var campo = campoConfigDe(escrita);
+    if (!campo) {
+      var ehAuditoria = LINHAS_AUDITORIA.indexOf(escrita) >= 0 ||
+        LINHAS_AUDITORIA.indexOf(semAcentoConfig(escrita).toLowerCase().replace(/[^a-z0-9]/g, '')) >= 0;
+      if (!ehAuditoria && CHAVES_IGNORADAS.indexOf(escrita) < 0) CHAVES_IGNORADAS.push(escrita);
+      continue;
+    }
+
+    saida[campo] = campo === 'chavePix' ? chavePixLimpa(valores[i][1]) : valores[i][1];
   }
 
   return Object.keys(saida).length ? saida : null;

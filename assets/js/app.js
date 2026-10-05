@@ -1008,11 +1008,54 @@
       .slice(0, limite);
   }
 
+  /* Chave PIX de telefone e so digito: 55 + DDD + numero, sem "+", sem
+     espaco e sem hifen. O dono copia do app do banco, que mostra
+     "+55 98 98881-5481"; com o "+" o QR sai invalido — parece
+     funciona e ninguem recebe. A planilha ja entrega limpa; repetir
+     aqui cobre o valor que ficou so no cache do navegador, de um
+     envio antigo. */
+  function chavePixLimpa(valor) {
+    var s = String(valor == null ? '' : valor).trim();
+    if (!s) return '';
+    if (!/^\+?[0-9 ()./-]+$/.test(s)) return s;
+
+    var digitos = s.replace(/[^0-9]/g, '');
+    var n = digitos.length;
+
+    if (s.indexOf('+') >= 0) return digitos;
+    if (n === 12 || n === 13 || n === 14) return digitos;
+
+    /* Onze digitos e ambiguo (CPF com pontuacao ou telefone sem o
+       +55): so limpa quando o digito verificador confirma o CPF. */
+    if (n === 11 && cpfValido(digitos)) return digitos;
+
+    return s;
+  }
+
+  /* CPF tem digito verificador. */
+  function cpfValido(digitos) {
+    var d = String(digitos || '');
+    if (!/^\d{11}$/.test(d) || /^(\d)\1{10}$/.test(d)) return false;
+
+    var soma = 0;
+    for (var i = 0; i < 9; i++) soma += Number(d.charAt(i)) * (10 - i);
+    var resto = (soma * 10) % 11;
+    if (resto === 10) resto = 0;
+    if (resto !== Number(d.charAt(9))) return false;
+
+    soma = 0;
+    for (var j = 0; j < 10; j++) soma += Number(d.charAt(j)) * (11 - j);
+    resto = (soma * 10) % 11;
+    if (resto === 10) resto = 0;
+
+    return resto === Number(d.charAt(10));
+  }
+
   /* Monta o "PIX copia e cola" com o valor do pedido. Devolve '' se a
      chave ainda nao foi cadastrada. */
   function montarPixPayload(valor) {
     var cfg = Store.dados().config;
-    var chave = String(cfg.chavePix || '').trim();
+    var chave = chavePixLimpa(cfg.chavePix);
     if (!chave) return '';
 
     var nome = textoPix(cfg.nome, 25) || 'LOJA';
@@ -1166,7 +1209,7 @@
     if (semAcento(valor).indexOf('pix') < 0) { box.innerHTML = ''; return; }
 
     var cfg = Store.dados().config;
-    if (!String(cfg.chavePix || '').trim()) {
+    if (!chavePixLimpa(cfg.chavePix)) {
       box.innerHTML = '<p class="dica">PIX selecionado. O dono ainda não cadastrou a chave PIX.</p>';
       return;
     }

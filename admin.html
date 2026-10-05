@@ -7,7 +7,7 @@
   <title>Painel do Cardápio</title>
   <meta name="description" content="Área do dono: edite itens, preços e categorias, e exporte o cardápio em JSON.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
-  <link rel="stylesheet" href="assets/css/style.css?v=20261004j">
+  <link rel="stylesheet" href="assets/css/style.css?v=20261004m">
 </head>
 <body>
 
@@ -181,7 +181,7 @@
           <p class="dica" style="margin:0 0 14px;color:var(--texto-suave);font-size:.88rem">
             <strong>A planilha é a fonte da verdade.</strong> A página do cliente monta o cardápio
             de lá: categorias, itens, preços, destaques, imagens e os dados da loja. O que você
-            edita aqui só chega ao cliente depois de <em>Enviar cardápio agora</em>.
+            edita aqui só chega ao cliente depois de <em>Gravar alterações no servidor</em>.
             <br><br>
             Cada pedido continua virando uma linha em <code>Pedidos</code> e uma linha por item em
             <code>Itens</code>. O script que faz a gravação está em <code>planilha.gs</code> — cole
@@ -202,16 +202,16 @@
             </div>
             <div class="campo" style="justify-content:flex-end;gap:10px;flex-wrap:wrap">
               <button type="button" class="btn btn-contorno" id="btnLerPlanilha">⬇ Buscar da planilha</button>
-              <button type="button" class="btn btn-primario" id="btnEnviarCardapio">⬆ Enviar cardápio agora</button>
+              <button type="button" class="btn btn-primario" id="btnEnviarCardapio">⬆ Gravar alterações no servidor</button>
               <button type="button" class="btn btn-contorno" id="btnTestarPlanilha">Testar conexão</button>
             </div>
           </div>
           <p class="dica" style="margin:14px 0 0;color:var(--texto-suave);font-size:.88rem">
-            O botão de envio é em <code>no-cors</code>: o navegador não consegue ler a resposta do
-            Google, então a confirmação de verdade é ver a aba <code>Registro</code> do script.
-            <em>Buscar da planilha</em> usa um <code>GET</code> comum e devolve o que está
-            publicado — é por ele que o painel enxerga as alterações feitas direto no Google,
-            e é ele que avisa se o script no Google estiver desatualizado.
+            <em>Gravar alterações no servidor</em> grava as quatro abas num envio só e espera a
+            resposta do script: se o Google recusar, o motivo aparece aqui em vez de o botão
+            dizer que deu certo. <em>Buscar da planilha</em> usa um <code>GET</code> comum e
+            devolve o que está gravado — é por ele que o painel enxerga as alterações feitas
+            direto no Google, e é ele que avisa se o script no Google estiver desatualizado.
           </p>
 
           <p id="avisoSite" class="aviso-publicar oculto" role="status" style="margin-top:14px">
@@ -276,7 +276,7 @@
           <p class="dica" style="margin:0 0 14px;color:var(--texto-suave);font-size:.88rem">
             Quando há bairros cadastrados, o cliente escolhe o dele no checkout e a taxa do
             bairro substitui a <em>Taxa de entrega</em> das Configurações. Sem bairros, vale
-            só a taxa única. Estas linhas viram a aba <code>Bairros</code> ao publicar.
+            só a taxa única. Estas linhas viram a aba <code>Bairros</code> ao gravar no servidor.
           </p>
           <div class="lista-admin" id="listaBairros"></div>
         </div>
@@ -319,7 +319,7 @@
 
     <footer class="rodape">
       <div class="container">
-        <p>Alterações são salvas neste navegador e passam a valer para o cliente depois de publicadas na planilha.</p>
+        <p>Alterações são salvas neste navegador e passam a valer para o cliente depois de gravadas no servidor.</p>
         <div class="rodape-links">
           <a href="index.html">Ir para o cardápio</a>
         </div>
@@ -341,9 +341,9 @@
     </div>
   </div>
 
-  <script src="assets/js/planilha-site.js?v=20261004j"></script>
-  <script src="assets/js/store.js?v=20261004j"></script>
-  <script src="assets/js/planilha.js?v=20261004j"></script>
-  <script src="assets/js/admin.js?v=20261004j"></script>
+  <script src="assets/js/planilha-site.js?v=20261004m"></script>
+  <script src="assets/js/store.js?v=20261004m"></script>
+  <script src="assets/js/planilha.js?v=20261004m"></script>
+  <script src="assets/js/admin.js?v=20261004m"></script>
 </body>
 </html>

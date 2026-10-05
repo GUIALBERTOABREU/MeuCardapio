@@ -63,7 +63,7 @@ O cardápio de exemplo vem com o número fictício `5511999999999`. **Troque pel
 3. Campo **WhatsApp (com DDD)**: só números, com código do país e DDD, sem espaços,
    `+` ou traço. Ex.: `5511987654321`
 4. Clique em **Salvar**
-5. Clique em **⬆ Enviar cardápio agora** — sem publicar, o número novo não chega
+5. Clique em **⬆ Gravar alterações no servidor** — sem publicar, o número novo não chega
    ao cliente
 
 O mesmo campo aparece para o cliente dentro do carrinho.
@@ -89,11 +89,14 @@ Na aba **Configurações**:
 - **Tempo de entrega** e **tempo de retirada** — a previsão mostrada ao cliente
   (`30-40 min`), separada por tipo
 - **Endereço da loja** e **Instagram** — aparecem no rodapé do cardápio
+- **Chave PIX** e **Cidade do recebedor** — com os dois preenchidos, o checkout ganha
+  o "PIX copia e cola" e o QR Code. A chave aceita CPF, CNPJ, e-mail, telefone ou
+  chave aleatória, e telefone com `+` é arrumado sozinho na leitura
 - **Bairros** (aba própria) — taxa e tempo por bairro; quando há bairros cadastrados,
   o cliente escolhe o dele e a taxa do bairro vence a taxa única
 
 Tudo isso vai para a planilha em **Config** (os bairros vão para a aba **Bairros**)
-quando você clicar em **Enviar cardápio agora**. O painel salva sozinho, mas o cliente
+quando você clicar em **Gravar alterações no servidor**. O painel salva sozinho, mas o cliente
 só vê depois de publicar — por isso existe o aviso em cima das abas.
 
 ## Cadastrar itens
@@ -171,18 +174,18 @@ Isso significa que:
 
 - **A planilha do Google é a fonte da verdade.** Ela manda em tudo: categorias,
   itens, preços, destaques, imagens e os dados da loja.
-- O que você edita no painel **não chega ao cliente** até clicar em **Enviar cardápio
-  agora**. Enquanto isso, o painel mostra um aviso em cima das abas.
+- O que você edita no painel **não chega ao cliente** até clicar em **Gravar
+  alterações no servidor**. Enquanto isso, o painel mostra um aviso em cima das abas.
 - Cada navegador guarda uma cópia para a página abrir sem esperar a rede. Se a
   planilha falhar, o cliente continua vendo o último cardápio que ele já tinha —
   um cardápio velho é melhor do que uma tela vazia.
 - Limpar os dados do navegador apaga a cópia local do painel, mas **não** o que está
-  publicado na planilha. Dá para recuperar com **Buscar da planilha**.
+  gravado na planilha. Dá para recuperar com **Buscar da planilha**.
 
-Fluxo para publicar mudanças:
+Fluxo para gravar mudanças:
 
 ```
-painel → edite o que quiser  →  ⬆ Enviar cardápio agora  →  cliente vê
+painel → edite o que quiser  →  ⬆ Gravar alterações no servidor  →  cliente vê
 ```
 
 Alternativa, editando direto no Google Sheets: mexa na planilha e clique em
@@ -402,7 +405,7 @@ administra.
 > mostra um aviso vermelho na aba *Configurações* dizendo isso, com a URL que está
 > configurada aqui para você copiar. Não ignore esse aviso.
 
-Depois clique em **⬆ Enviar cardápio agora** uma vez. Isso cria a aba `Cardápio`
+Depois clique em **⬆ Gravar alterações no servidor** uma vez. Isso cria a aba `Cardápio`
 com as 9 colunas e a aba `Config` com os dados da loja. Sem essa primeira
 publicação a planilha fica vazia e o cardápio continua mostrando o exemplo.
 
@@ -434,12 +437,16 @@ os dois lugares — o campo **URL do Web App** do painel e o `planilhaUrl` do
 `planilha-site.js`. O painel usa o campo dele; o cliente usa o arquivo. Deixar um
 dos dois para trás faz um lado falar com a implantação antiga.
 
-### O aviso de "não publicado"
+### O aviso de "não gravado"
 
-O painel compara o que está na tela com o que foi publicado da última vez. Havendo
-diferença, aparece um aviso em cima das abas, com um botão que leva direto ao botão
-de envio. Ele existe porque o painel salva sozinho e dá a impressão de que
-publicou — e não publicou.
+O painel compara o que está na tela com o que foi gravado da última vez. Havendo
+diferença, aparece um aviso em cima das abas:
+
+> O cliente ainda não está vendo estas alterações — **grave no servidor**
+> [⬆ Gravar alterações no servidor]
+
+Ele existe porque o painel salva sozinho neste navegador e dá a impressão de que
+gravou — e não gravou.
 
 A comparação ignora a URL e o token da planilha de propósito: eles nunca vão para a
 planilha, e incluí-los faria o aviso nunca se resolver.
@@ -451,9 +458,9 @@ tela. Use quando você mexer direto no Google Sheets — de outro computador, pe
 celular, ou por fórmula.
 
 O painel já faz isso sozinho ao abrir. A única vez que ele **não** troca é quando
-você tem alterações locais sem publicar: aí ele avisa o que encontrou e espera você
-clicar, e o clique ainda pede confirmação, porque ali sim o trabalho feito à mão
-seria descartado.
+você tem alterações locais sem gravar no servidor: aí ele avisa o que encontrou e
+espera você clicar, e o clique ainda pede confirmação, porque ali sim o trabalho
+feito à mão seria descartado.
 
 ### O cardápio é montado pela planilha
 
@@ -682,17 +689,62 @@ Duas colunas, `Chave` e `Valor`, com uma linha por configuração:
 `nome`, `descricao`, `whatsapp`, `mensagemAbertura`, `corPrimaria`,
 `simboloMoeda`, `taxaEntrega`, `pedidoMinimo`, `aberto`, `mensagemFechado`,
 `pedirNome`, `pedirEntrega`, `formasPagamento`, `tempoEntrega`, `tempoRetirada`,
-`enderecoLoja`, `instagram`.
+`enderecoLoja`, `instagram`, `chavePix`, `pixCidade`.
 
-No fim há uma linha `publicado_em`, que é só um comentário de quando foi a última
-publicação. `taxaEntrega` e `pedidoMinimo` saem formatados em R$.
+No fim há três linhas de rastro — `url-do-web-app`, `token-do-script` e
+`publicado_em` — que o painel grava sozinho e **não** voltam para o cardápio.
+`taxaEntrega` e `pedidoMinimo` saem formatados em R$.
+
+`planilhaUrl` e `planilhaToken` **não** vão para a planilha: a URL diz onde ler, e
+pedir isso à planilha seria circular. Elas ficam só no navegador.
+
+##### A coluna A aceita o rótulo, não só o nome interno
+
+O nome interno é `chavePix`, mas ninguém decora isso — o dono digita o que lê na
+tela. Por isso a comparação **ignora maiúsculas, acentos, espaços e pontuação**,
+e alguns rótulos são amarrados ao campo certo:
+
+| O que você escreve na coluna A | Vira |
+|---|---|
+| `chavePix`, `CHAVEPIX`, `Chave Pix`, `chave pix`, `chave_pix`, `chave-pix` | `chavePix` |
+| `Chave`, `PIX`, `Pix chave` | `chavePix` |
+| `pixCidade`, `PIXCIDADE`, `Cidade`, `Cidade do Recebedor` | `pixCidade` |
+| `Estado do recebedor` | `pixCidade` |
+
+Uma linha que não corresponde a nada disso é **ignorada em silêncio** — e o painel
+avisa, depois de "Buscar da planilha":
+
+> Aba Config: 1 linha(s) com nome não reconhecido (lembrete). Elas não chegam ao
+> cardápio — renomeie na coluna A para o nome interno (ex.: chavePix, pixCidade).
+
+Na resposta do script isso viaja em `chavesIgnoradas`, e **só o nome da linha** —
+o valor de uma linha não reconhecida nunca é devolvido. As três linhas de rastro
+(`url-do-web-app`, `token-do-script`, `publicado_em`) estão na lista de exceção e
+não geram aviso: são esperadas, não erro de digitação.
+
+> ⚠️ Essa tolerância é do **`planilha.gs`**. Só vale depois de reimplantar o script.
+
+#### A chave PIX
+
+`chavePix` e `pixCidade` montam o "PIX copia e cola" e o QR Code do checkout. Sem
+`chavePix` o cliente vê "o dono ainda não cadastrou a chave PIX" e não tem como pagar.
+
+**`chavePix`** aceita CPF, CNPJ, e-mail, telefone ou chave aleatória. Se for
+telefone, o valor é arrumado sozinho na leitura: `+55 98 98881-5481` vira
+`5598988815481`. Sem isso o QR sai inválido — parece funcionar e ninguém recebe.
+
+Uma ressalva: **onze dígitos é ambíguo**, pode ser CPF com pontuação ou telefone sem
+o `+55`. O script só arruma onze dígitos quando o dígito verificador confirma que é
+CPF. Nos outros casos ele deixa o texto como você digitou, em vez de trocar uma chave
+por outra em silêncio. E-mail e chave aleatória nunca são mexidos (têm letra).
+
+**`pixCidade`** é a cidade do recebedor, e o banco compara. Acento e maiúscula não
+são problema: o BR Code é montado em ASCII maiúsculo, e `São Luís` vira `SAO LUIS`
+(8 de 15 caracteres). O que o banco não tolera é a cidade **errada**.
 
 Os bairros ficam numa aba separada (**Bairros**, colunas `Bairro`, `Taxa`, `Tempo`,
 `Ativo`), uma linha por bairro. Lista vazia é normal e significa "uso a taxa única do
 `Config`"; quando há bairros, a taxa do bairro escolhido vence.
-
-`planilhaUrl` e `planilhaToken` **não** vão para a planilha: a URL diz onde ler, e
-pedir isso à planilha seria circular. Elas ficam só no navegador.
 
 #### Aba `Pedidos`
 
@@ -768,18 +820,35 @@ O painel é a exceção declarada: ele pede ao `planilha.js` para usar a URL do
 `localStorage` dele, porque precisa testar contra uma planilha de ensaio ou um
 servidor local sem mexer no arquivo que vai junto com o site.
 
+### Quais ações leem a resposta do script, e quais não
+
+O envio por `POST` tem dois caminhos, e a diferença é se o navegador **lê** o que o
+Apps Script respondeu.
+
+| Ação | Caminho | Lê a resposta? |
+|---|---|---|
+| Cliente envia pedido | `postar` (`no-cors`) | ❌ não |
+| Dono publica o cardápio | `postarLendo` (`cors`) | ✅ sim |
+| Dono muda o status do pedido | `postarLendo` (`cors`) | ✅ sim |
+| Dono zera os pedidos | `postarLendo` (`cors`) | ✅ sim |
+
+Em `no-cors` a resposta chega ao navegador como **opaque**: ele só descobre que a
+chamada saiu. O script pode ter devolvido `{"ok":false,"erro":"Token inválido."}` e o
+painel não vê. Por isso `postar` **não resolve** — quem chama precisa olhar o `r.ok`
+antes de comemorar.
+
+O pedido do cliente é a única exceção de propósito: a aba fecha na hora, o cliente
+vai para o WhatsApp, e a aba `Registro` do script é a confirmação. `text/plain`
+também evita preflight e navegador antigo — o caminho do cliente não depende de
+cabeçalho nenhum.
+
+Os outros três vão em `cors` e leem o JSON (o ContentService responde com
+`Access-Control-Allow-Origin: *`, verificado), com timeout de 20s. No tempo esgotado
+a mensagem diz para **conferir na planilha** em vez de sugerir que deu certo ou
+errado: o script pode ter respondido depois.
+
 ### Limites que valem saber
 
-- O envio é `POST` com `mode: 'no-cors'`. Isso é **escolha, não limitação**: o
-  ContentService do Apps Script responde o POST com `Access-Control-Allow-Origin: *`
-  (verificado), mas o `no-cors` não sofre com preflight nem com navegador antigo, então
-  o caminho do pedido nunca depende de cabeçalho nenhum. O preço é que o navegador
-  **não lê a resposta**: se a URL estiver errada, o botão de teste só avisa que a chamada
-  saiu. Quem confirma a gravação é a aba `Registro` do script.
-- **Exceção, de propósito:** a ação **Zerar pedidos** usa um segundo caminho
-  (`postarLendo`) em `cors`, porque apagar é sem volta e o dono precisa ver quantas
-  linhas caíram e ler o erro quando a frase de confirmação estiver errada. Sem isso o
-  botão seria às cegas — o pior jeito de apagar um histórico.
 - Free do Google: 20 mil células por dia numa conta, bem acima do volume de uma
   lanchonete. O limite real costuma ser o do próprio navegador.
 - **`file://` não funciona com planilha nenhuma.** Abrir a pasta com dois cliques
@@ -789,6 +858,14 @@ servidor local sem mexer no arquivo que vai junto com o site.
 - A planilha grava os dados que o cliente digita (nome, endereço, pagamento).
   Sai da sua máquina e vai para uma conta do Google: vale avisar na descrição do
   cardápio que as informações são usadas para o pedido.
+- **O painel só lê a planilha depois do login.** Antes da senha ele mostra o exemplo
+  embutido (o nome aparece como "Lanchonete do Zé"). Num navegador novo, espere ver o
+  nome verdadeiro antes de apertar **Gravar alterações no servidor**: o botão grava o que
+  está na tela.
+- **Gravar alterações no servidor** grava as quatro abas num `POST` só, na ordem `Cardápio`,
+  `Config`, `Bairros`, `Opcoes`. Se uma falhar no meio, as anteriores já foram
+  gravadas e a planilha fica misturada. O painel mostra `NÃO GRAVOU` com o erro do script,
+  mas vale olhar a aba `Registro` depois de um problema assim.
 
 ## Estrutura
 

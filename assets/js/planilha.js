@@ -1118,15 +1118,27 @@
     /* Um POST so com as abas: se a rede falhar no meio, o script
        processa na ordem e o cardapio fica consistente com a
        configuracao. Bairros e Opcoes vao sempre, mesmo vazias, para
-       limpar o que o dono apagou. */
-    return postar('cardapio', [
-      { nome: 'Cardápio', modo: 'replace', cabecalho: cat.cabecalho, linhas: cat.linhas },
-      { nome: 'Config', modo: 'replace', cabecalho: conf.cabecalho, linhas: conf.linhas },
-      { nome: 'Bairros', modo: 'replace', cabecalho: bai.cabecalho, linhas: bai.linhas },
-      { nome: 'Opcoes', modo: 'replace', cabecalho: opc.cabecalho, linhas: opc.linhas }
-    ]).then(function (r) {
+       limpar o que o dono apagou.
+
+       Este vai por `postarLendo` e nao pelo `postar` de cima: o dono
+       precisa saber se gravou. No `postar` (no-cors) o navegador
+       entrega a resposta como "opaque", o script pode ter devolvido
+       {"ok":false,"erro":"Token invalido."} e o painel mostrava
+       "15 itens enviados" contando o que ele tentou mandar. */
+    return postarLendo('cardapio', {
+      abas: [
+        { nome: 'Cardápio', modo: 'replace', cabecalho: cat.cabecalho, linhas: cat.linhas },
+        { nome: 'Config', modo: 'replace', cabecalho: conf.cabecalho, linhas: conf.linhas },
+        { nome: 'Bairros', modo: 'replace', cabecalho: bai.cabecalho, linhas: bai.linhas },
+        { nome: 'Opcoes', modo: 'replace', cabecalho: opc.cabecalho, linhas: opc.linhas }
+      ]
+    }).then(function (r) {
       r.itens = cat.linhas.length;
-      marcarPublicado();
+
+      /* Marcar como publicado antes de saber se gravou deixaria o
+         painel achando que esta em dia com a planilha mesmo depois de
+         um erro — e o proximo "Buscar" diria que nao ha mudanca. */
+      if (r.ok === true) marcarPublicado();
       return r;
     });
   }
@@ -1183,26 +1195,39 @@
   function alterarStatusPedido(pedido, novoStatus) {
     if (!configurada()) return Promise.reject(new Error('Planilha não configurada.'));
 
-    return postar('alterarStatus', [
-      { nome: 'Pedidos', modo: 'updateStatus', pedido: pedido, status: novoStatus }
-    ]);
+    /* Mesmo motivo do cardápio: quem muda o status precisa saber se a
+       mudanca chegou. O cliente acompanha pela tela Acompanhar, que le
+       o status da planilha — se o POST falhou, o dono achava que tinha
+       avisado e o cliente seguia vendo o status velho. */
+    return postarLendo('alterarStatus', {
+      abas: [
+        { nome: 'Pedidos', modo: 'updateStatus', pedido: pedido, status: novoStatus }
+      ]
+    });
   }
 
   /* ---------------------------------------------------------
      3b. Ações que precisam de resposta (só o painel do dono)
 
      O `postar` acima vai em no-cors e por isso nao le o que o
-     servidor devolveu. Isso foi choice na epoca porque se
+     servidor devolveu: a resposta chega como "opaque" e o navegador
+     so sabe que a chamada saiu. Isso foi escolha na epoca porque se
      achou que o POST do Apps Script nao devolvia CORS — mas
-     verify agora: a resposta vem com `Access-Control-Allow-Origin: *`
+     verificado agora: a resposta vem com `Access-Control-Allow-Origin: *`
      e o JSON pode ser lido normalmente.
 
-     Enviar pedido nao precisa da resposta (a propria planilha
-     confirma, e o Registro mostra). JA APAGAR TUDO precisa: e uma
-     acao sem volta, e o dono tem de ver quantas linhas cairam e
-     receber o erro quando a frase de confirmacao estiver errada,
-     senao ele ficaria sem saber se deu certo. Por isso aqui o
-     POST vai em cors mesmo.
+     O `postar` continua no pedido do cliente (enviarPedido): ali a aba
+     fecha na hora, o cliente vai para o WhatsApp e a propria planilha
+     confirma. E nos outros tres a resposta e obrigatoria, porque o
+     dono age em cima do que a tela diz:
+
+       - limparPedidos      sem volta; e o erro quando a frase bate errada
+       - enviarCardapio     o dono precisa saber se os clientes vao ver
+       - alterarStatusPedido  o cliente acompanha o status pela tela
+
+     Nos tres, `no-cors` significava "deu certo" mesmo com o script
+     tendo respondido {"ok":false}. Por isso aqui o POST vai em cors
+     e quem chama precisa olhar o `r.ok` antes de comemorar.
      --------------------------------------------------------- */
   function postarLendo(acao, extra) {
     var corpo = JSON.stringify({
@@ -1210,7 +1235,7 @@
       token: token(),
       origem: origem(),
       confirmacao: (extra && extra.confirmacao) || '',
-      abas: []
+      abas: (extra && extra.abas) || []
     });
 
     return new Promise(function (resolve, reject) {
@@ -1222,8 +1247,14 @@
         resolve(r);
       }
 
+      /* Nao da para prometer que nada foi gravado no tempo esgotado:
+         o script pode ter respondido depois. A mensagem diz isso, em
+         vez de sugerir que deu tudo errado (ou tudo certo). */
       setTimeout(function () {
-        responder({ ok: false, erro: 'Tempo esgotado. Confira se a limpeza aconteceu na planilha.' });
+        responder({
+          ok: false,
+          erro: 'Tempo esgotado (20s) sem resposta do Apps Script. Confira na planilha se a alteração chegou a gravar — o script pode ter respondido depois.'
+        });
       }, 20000);
 
       fetch(base(), {
@@ -1243,11 +1274,11 @@
         .then(function (json) {
           if (json === null) return;
           if (!json || json.ok !== true) {
-            responder({ ok: false, erro: (json && json.erro) || 'Resposta inesperada do script.', apagados: json && json.apagados });
+            responder({ ok: false, erro: (json && json.erro) || 'Resposta inesperada do script.', apagados: json && json.apagados, abas: json && json.abas });
             return;
           }
           remember(acao + ' · ' + new Date().toLocaleString('pt-BR'));
-          responder({ ok: true, apagados: json.apagados || {} });
+          responder({ ok: true, apagados: json.apagados || {}, abas: json.abas || [] });
         })
         .catch(function (e) {
           responder({ ok: false, erro: 'Falha ao falar com o Apps Script: ' + (e && e.message ? e.message : e) });

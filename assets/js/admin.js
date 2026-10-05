@@ -793,7 +793,7 @@
 
     var botao = el.btnLerPlanilha;
     botao.disabled = true;
-    el.resultadoPlanilha.textContent = 'Buscando o que está publicado…';
+    el.resultadoPlanilha.textContent = 'Buscando o que está gravado…';
 
     P.lerCardapio().then(function (r) {
       botao.disabled = false;
@@ -805,6 +805,21 @@
         return;
       }
 
+      /* Linha da aba Config que o script nao reconheceu. Sem este aviso
+         ela some em silencio e o dono acredita que configurou: foi o
+         que aconteceu com "chave PIX" escrito no lugar de "chavePix".
+         O script so manda o nome da linha, nunca o valor. */
+      (function avisarLinhasNaoReconhecidas(resp) {
+        var sobras = resp && resp.chavesIgnoradas;
+        if (!sobras || !sobras.length) return;
+        avisar(
+          'Aba Config: ' + sobras.length + ' linha(s) com nome não reconhecido (' +
+          sobras.join(', ') + '). Elas não chegam ao cardápio — renomeie na coluna A ' +
+          'para o nome interno (ex.: chavePix, pixCidade).',
+          'erro'
+        );
+      })(r);
+
       var previa = P.comparar(r);
       var temEdicaoLocal = P.pendentes();
 
@@ -812,8 +827,8 @@
          que esta na tela e o unico cardapio que existe. */
       if (!previa.categorias && !previa.muda) {
         el.resultadoPlanilha.textContent = temEdicaoLocal
-          ? 'A planilha ainda não tem cardápio publicado. O que está na tela nunca foi enviado.'
-          : 'A planilha ainda não tem cardápio publicado. Clique em "Enviar cardápio agora" para gravar o que está na tela.';
+          ? 'O servidor ainda não tem cardápio gravado. O que está na tela nunca foi enviado.'
+          : 'O servidor ainda não tem cardápio gravado. Clique em "Gravar alterações no servidor" para gravar o que está na tela.';
         return;
       }
 
@@ -829,7 +844,7 @@
 
       if (temEdicaoLocal && !forcar) {
         el.resultadoPlanilha.textContent =
-          'A planilha tem um cardápio diferente do que está na tela, e você tem alterações que não publicou. ' +
+          'O servidor tem um cardápio diferente do que está na tela, e você tem alterações que não gravou. ' +
           'Nada foi trocado: clique em "Buscar da planilha" para decidir.';
         return;
       }
@@ -838,7 +853,7 @@
          nao tem como desfazer: so volta o que estiver na planilha
          ou num JSON baixado antes. */
       if (temEdicaoLocal && !confirm(
-        'Você tem alterações que não publicou. Buscar da planilha vai substituir o que está na tela por ' +
+        'Você tem alterações que não gravou no servidor. Buscar da planilha vai substituir o que está na tela por ' +
         previa.categorias + ' categoria(s) e ' + previa.itens + ' item(ns) da planilha. Continuar?'
       )) {
         el.resultadoPlanilha.textContent = 'Nada foi alterado.';
@@ -850,7 +865,7 @@
       renderTudo();
 
       el.resultadoPlanilha.textContent = 'Planilha lida: ' + m.categorias + ' categoria(s), ' +
-        m.itens + ' item(ns). O painel agora mostra o que está publicado.';
+        m.itens + ' item(ns). O painel agora mostra o que está gravado no servidor.';
     }, function (erro) {
       botao.disabled = false;
       el.resultadoPlanilha.textContent = erro.message;
@@ -918,18 +933,32 @@
 
       var botao = el.btnEnviarCardapio;
       botao.disabled = true;
-      el.resultadoPlanilha.textContent = 'Enviando…';
+      el.resultadoPlanilha.textContent = 'Gravando…';
 
       P.enviarCardapio().then(function (r) {
         botao.disabled = false;
-        el.resultadoPlanilha.textContent = r.itens + ' item(ns) enviados para a aba "Cardápio" e ' +
-          P.camposConfig.length + ' configurações para a aba "Config". Confira o "Registro" em alguns segundos.';
-        avisar(r.itens + ' itens enviados para a planilha ✅', 'ok');
+
+        /* `enviarCardapio` vai por `postarLendo` (cors) e por isso
+           RESOLVE com {ok:false, erro} quando o script recusa — ele não
+           rejeita. Sem este if, token errado ou aba com problema
+           mostravam "15 itens gravados ✅" contando o que o painel
+           tentou mandar, e o dono só descobria quando o cliente
+           reclamava do cardápio velho. */
+        if (!r || r.ok !== true) {
+          var erro = (r && r.erro) || 'o script não respondeu.';
+          el.resultadoPlanilha.textContent = 'NÃO GRAVOU: ' + erro;
+          avisar('As alterações não chegaram ao servidor.', 'erro');
+          return;
+        }
+
+        el.resultadoPlanilha.textContent = r.itens + ' item(ns) gravados na aba "Cardápio" e ' +
+          P.camposConfig.length + ' configurações na aba "Config". Confira o "Registro" em alguns segundos.';
+        avisar(r.itens + ' itens gravados no servidor ✅', 'ok');
         renderTudo();
       }, function (erro) {
         botao.disabled = false;
-        el.resultadoPlanilha.textContent = erro.message;
-        avisar('Falha ao enviar o cardápio.', 'erro');
+        el.resultadoPlanilha.textContent = 'NÃO GRAVOU: ' + erro.message;
+        avisar('Falha ao gravar as alterações.', 'erro');
       });
     });
 
@@ -1407,7 +1436,7 @@
 
     var texto = document.createTextNode('O cliente ainda não está vendo estas alterações — ');
     var forte = document.createElement('b');
-    forte.textContent = 'publique na planilha';
+    forte.textContent = 'grave no servidor:';
 
     aviso.appendChild(texto);
     aviso.appendChild(forte);
@@ -1415,7 +1444,7 @@
     var botao = document.createElement('button');
     botao.type = 'button';
     botao.className = 'btn btn-primario btn-sm';
-    botao.textContent = '⬆ Enviar cardápio agora';
+    botao.textContent = '⬆ Gravar alterações no servidor';
     botao.addEventListener('click', function () {
       /* O aviso pode estar na aba "Itens" ou "JSON", onde o botao
          de verdade nao esta visivel. Trocar de aba e mover o foco

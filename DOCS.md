@@ -67,9 +67,11 @@ cardapio/
 
 | Campo | Valor |
 |-------|-------|
-| **URL do Web App** | `https://script.google.com/macros/s/AKfycbwLEZbqNOSMqEOc2ReYrD-DvOBSuRR7Sg5b6BNrwG8vAUpeMrRIM1Tfr7G7mOrMjIUeZA/exec` |
+| **URL do Web App** | `https://script.google.com/macros/s/AKfycbz2jkv6A0uIjBSNd-nEoLFXrIelziKTEg5BUIlI83cZg5tozLVJ9lzECjmUmOnReH6-uA/exec` |
 | **Token** | `GUIGA9805_LINDO` |
 | **Status** | ✅ Conectado e funcionando |
+| **Onde fica a URL no site** | `assets/js/planilha-site.js` (o mesmo valor, para conferência) |
+| **Versão do script no ar** | ⚠️ ainda a **antiga** — falta reimplantar o `planilha.gs` |
 
 ### Loja
 
@@ -82,6 +84,11 @@ cardapio/
 | **Pedido mínimo** | R$ 10,00 |
 | **Cor principal** | #8B1A1A |
 | **Status** | Aberto |
+| **Chave PIX** | `5598988815481` (telefone, DDD 98) |
+| **Cidade do recebedor** | São Luís |
+
+Os dois últimos são o que faz o checkout ter "PIX copia e cola" e QR Code. Sem eles o
+cliente vê um aviso de que a chave ainda não foi cadastrada.
 
 ### Painel Admin
 
@@ -123,10 +130,10 @@ cardapio/
    - No checkout, o **bairro também é selecionado sozinho** quando o cliente
      digita o nome dele no endereço (ex.: "Rua X, 10 — Centro")
 
-5. **Publicar na planilha**
-   - Clique em **⬆ Enviar cardápio agora**
+5. **Gravar no servidor**
+   - Clique em **⬆ Gravar alterações no servidor**
    - Isso grava tudo no Google Sheets
-   - O cliente vê as mudanças imediatamente
+   - O cliente vê as mudanças na próxima vez que abrir o cardápio
 
 6. **Backup JSON**
    - Aba **Arquivo JSON**
@@ -240,6 +247,63 @@ Qualquer hospedagem de site estático serve:
 - Limpe os dados do navegador e tente novamente
 - Verifique se o `localStorage` está habilitado
 
+### Escrevi uma linha na `Config` e ela não teve efeito
+
+Quase sempre é o nome na coluna A. A comparação **ignora maiúsculas, acentos,
+espaços e pontuação**, e alguns rótulos são amarrados ao campo certo:
+
+| O que você escreveu | Vira |
+|---|---|
+| `chave PIX`, `Chave Pix`, `CHAVEPIX`, `chave_pix` | `chavePix` |
+| `Chave`, `PIX` | `chavePix` |
+| `cidade do recebedor`, `Cidade`, `Estado do recebedor` | `pixCidade` |
+
+Se não for nenhum desses, a linha é **ignorada em silêncio** — e o painel avisa depois
+de "Buscar da planilha":
+
+> Aba Config: 1 linha(s) com nome não reconhecido (nome-que-ti-errado). Elas não
+> chegam ao cardápio — renomeie na coluna A para o nome interno.
+
+**Se esse aviso não aparece, o `planilha.gs` antigo ainda está implantado.** A
+tolerância ao rótulo é do script, não do painel: reimplantar (Apps Script → Implantar
+→ Nova implantação) é o que ativa. O `publicado_em`, `url-do-web-app` e
+`token-do-script` são esperado e não geram aviso.
+
+### O PIX não aparece / o QR não paga
+
+1. Confira se a `Config` tem **`chavePix`** com valor e **`pixCidade`** com a cidade
+   do recebedor. Sem a chave o cliente vê "o dono ainda não cadastrou a chave PIX".
+2. Se a chave é telefone, pode ser `+55 98 98881-5481` — o arrumo dos `+` é automático.
+   Onze dígitos só é tratado como telefone se o CPF não fechar; nesse caso o texto
+   fica como você digitou.
+3. A cidade precisa ser a **do recebedor da chave**, não a da loja. Acento e maiúscula
+   não importam (`São Luís` vira `SAO LUIS`).
+4. Abra `pix.html?p=...` e confira se a imagem do QR carrega (botão direito → abrir
+   imagem em nova aba). Um QR que não carrega é outra coisa que não é o PIX.
+
+### O painel disse que enviou, mas a planilha não mudou
+
+Isso **não** acontece mais nas três ações do dono (gravar o cardápio, mudar status,
+zerar pedidos): elas leem a resposta do script e mostram `NÃO GRAVOU: <erro>` se o
+Google recusar. Se aparecer "enviado", a planilha gravou.
+
+A exceção é o **pedido do cliente**, que vai em `no-cors` de propósito: a aba fecha na
+hora e o cliente vai para o WhatsApp. Se um pedido não aparecer, olhe a aba
+`Registro` do script — o motivo está lá (`bloqueado / token inválido`, etc.).
+
+### Mudei o status e o cliente não viu
+
+Agora a tela **Acompanhar** reflete o status novo, porque a mudança é confirmada pelo
+script. Se o painel mostrar `NÃO ALTEROU`, o status **não** foi gravado — repita.
+Se mostrar o "ok" e o cliente ainda ver o velho, recarregue a tela do cliente.
+
+### Antes de apertar "Gravar alterações no servidor" num navegador novo
+
+O painel **só lê a planilha depois do login**. Antes da senha ele mostra o exemplo
+embutido (o nome aparece como "Lanchonete do Zé"). O botão publica o que está na tela:
+esperar ver o nome verdadeiro antes de apertar é o que evita publicar o exemplo por
+cima do cardápio real.
+
 ---
 
 ## Segurança
@@ -288,6 +352,23 @@ Qualquer hospedagem de site estático serve:
 4. **Implantar → Nova implantação** (obrigatório!)
 5. Atualize a URL em `planilha-site.js` se mudou
 6. Suba o arquivo atualizado para a hospedagem
+
+**Salvar não é implantar.** Salvar só guarda o texto no editor; a planilha continua
+servindo a versão antiga. Sem o passo 4 nada muda do lado do dono — e é por isso que
+"digitei `chave PIX` e não funcionou" só se resolve depois de reimplantar.
+
+**Confira se pegou a versão nova** antes de acreditar que deu certo:
+
+```
+https://script.google.com/macros/s/SEU_ID/exec?config=1
+```
+
+Se aparecer o campo `chavesIgnoradas` na resposta, a versão nova está no ar. Se não
+aparecer, é a antiga — reimplantar de novo.
+
+Do lado do site, basta trocar os arquivos `.js`/`.html` na hospedagem: a versão vai no
+`?v=` dos `<script>`, então subir o arquivo com nome novo (ou o `?v=` novo) é o que
+faz o navegador pegar.
 
 ### ⚠️ Importante: modo replace
 
