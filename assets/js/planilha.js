@@ -17,6 +17,16 @@
    depender do retorno para dizer se deu certo - ele so
    detecta falha de rede. Quem confirma a gravacao e a propria
    planilha (e a aba "Registro", que o script preenche).
+
+   ATENCAO: o no-cors acima e escolha, e nao limitacao do
+   Apps Script. O ContentService responde com
+   `Access-Control-Allow-Origin: *` mesmo em POST, e da para ler
+   o JSON num fetch comum (ver postarLendo, mais abaixo). O que
+   motivou o no-cors foi uma outra coisa: no-cors nao sofre com
+   o preflight nem com navegador antigo, entao o caminho do
+   pedido nunca depende de cabecalho nenhum. Onde a resposta
+   importa mesmo - a acao que apaga tudo - o POST vai em cors,
+   ver postarLendo.
    ========================================================= */
 (function () {
   'use strict';
@@ -1178,6 +1188,81 @@
     ]);
   }
 
+  /* ---------------------------------------------------------
+     3b. Ações que precisam de resposta (só o painel do dono)
+
+     O `postar` acima vai em no-cors e por isso nao le o que o
+     servidor devolveu. Isso foi choice na epoca porque se
+     achou que o POST do Apps Script nao devolvia CORS — mas
+     verify agora: a resposta vem com `Access-Control-Allow-Origin: *`
+     e o JSON pode ser lido normalmente.
+
+     Enviar pedido nao precisa da resposta (a propria planilha
+     confirma, e o Registro mostra). JA APAGAR TUDO precisa: e uma
+     acao sem volta, e o dono tem de ver quantas linhas cairam e
+     receber o erro quando a frase de confirmacao estiver errada,
+     senao ele ficaria sem saber se deu certo. Por isso aqui o
+     POST vai em cors mesmo.
+     --------------------------------------------------------- */
+  function postarLendo(acao, extra) {
+    var corpo = JSON.stringify({
+      acao: acao,
+      token: token(),
+      origem: origem(),
+      confirmacao: (extra && extra.confirmacao) || '',
+      abas: []
+    });
+
+    return new Promise(function (resolve, reject) {
+      var pronto = false;
+
+      function responder(r) {
+        if (pronto) return;
+        pronto = true;
+        resolve(r);
+      }
+
+      setTimeout(function () {
+        responder({ ok: false, erro: 'Tempo esgotado. Confira se a limpeza aconteceu na planilha.' });
+      }, 20000);
+
+      fetch(base(), {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: corpo,
+        redirect: 'follow'
+      })
+        .then(function (resp) {
+          if (!resp.ok) {
+            responder({ ok: false, erro: 'A planilha respondeu ' + resp.status + '.' });
+            return null;
+          }
+          return resp.json();
+        })
+        .then(function (json) {
+          if (json === null) return;
+          if (!json || json.ok !== true) {
+            responder({ ok: false, erro: (json && json.erro) || 'Resposta inesperada do script.', apagados: json && json.apagados });
+            return;
+          }
+          remember(acao + ' · ' + new Date().toLocaleString('pt-BR'));
+          responder({ ok: true, apagados: json.apagados || {} });
+        })
+        .catch(function (e) {
+          responder({ ok: false, erro: 'Falha ao falar com o Apps Script: ' + (e && e.message ? e.message : e) });
+        });
+    });
+  }
+
+  /* Apaga todos os pedidos e itens. `confirmacao` precisa ser a frase
+     exata do script — é ela que impede um clique sozinho de apagar o
+     histórico. */
+  function limparPedidos(confirmacao) {
+    if (!configurada()) return Promise.reject(new Error('Planilha não configurada.'));
+    return postarLendo('limpar', { confirmacao: confirmacao });
+  }
+
   window.CardapioPlanilha = {
     configurada: configurada,
     enviarPedido: enviarPedido,
@@ -1186,6 +1271,7 @@
     statusDoPedido: statusDoPedido,
     lerPedidos: lerPedidos,
     alterarStatusPedido: alterarStatusPedido,
+    limparPedidos: limparPedidos,
     aplicarCardapio: aplicarCardapio,
     comparar: comparar,
     pendentes: alteracoesPendentes,

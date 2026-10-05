@@ -278,8 +278,8 @@ carrinho ganha o primeiro item, `reservarNumero()` sorteia um número e pergunta
 (`?pedido=...`) se ele já existe; se existir, sorteia outro, até 5 vezes. No clique em
 Finalizar o número já está conferido, então a janela do WhatsApp abre do jeito normal.
 
-Não dá para conferir **depois** de gravar: o POST vai em `mode: 'no-cors'` (o Apps Script não
-devolve cabeçalho de CORS), então o navegador não lê a resposta. Uma recusa do servidor seria
+Não dá para conferir **depois** de gravar: o envio do pedido vai em `mode: 'no-cors'`, então
+o navegador não lê a resposta. Uma recusa do servidor seria
 silenciosa e o cliente ficaria olhando "pedido não encontrado" para sempre. Também não dá para
 conferir no clique, porque abrir o WhatsApp depende do gesto do usuário e um bloqueador de
 pop-up barra a janela se a abertura atrasar. Daí a reserva antecipada.
@@ -292,6 +292,31 @@ No servidor há uma segunda camada: `lerStatusPedido` e `alterarStatusPedido` va
 baixo para cima e valem a linha **mais recente** quando o número aparece duas vezes — o pedido
 que o cliente acabou de fazer é o último. Vale menos que conferir antes de gravar, mas cobre o
 resto.
+
+## Zerar pedidos
+
+O painel (`admin.html`) tem **🗑 Apagar todos os pedidos**, logo abaixo do bloco da planilha.
+Ele apaga as linhas 2..N das abas `Pedidos` e `Itens` e **recalcula o `Relatorio` na hora**
+(a aba é gerada do zero a cada pedido, então ficaria com a conta velha na tela se não fosse
+refeita). Cardápio, `Config`, `Bairros` e `Opcoes` não são tocados.
+
+Diferente do `replace` (que usa `clearContents`), a limpeza usa `deleteRows(2, n)`: o
+cabeçalho, o negrito, a largura das colunas e a formatação de dinheiro continuam como estavam.
+
+São três camadas de proteção, porque apagar não tem volta:
+
+1. o `doPost` já exige o **token**;
+2. o script só apaga com a frase **exata** `apagar tudo` — comparada sem tolerar caixa nem
+   espaço sobrando, e o painel só habilita o botão quando o que foi digitado bate;
+3. o clique ainda passa por um `confirm()` do navegador.
+
+Depois de apagar, o painel mostra quantas linhas caíram ("Pronto: 15 pedido(s) e 43 item(ns)
+apagados"). Se a frase vier errada, a resposta volta legível e o aviso diz que **nada** foi
+apagado — é por isso que este caminho usa `postarLendo` (POST em `cors`) em vez do `postar`
+de sempre: um botão destrutivo que não responde seria pior do que não existir. Limpar duas
+vezes seguidas não dá erro, devolve zero.
+
+Só dá para deshazer pelo histórico de versões do Google Sheets (Arquivo → Histórico de versões).
 
 ## Acessibilidade e instalação
 
@@ -742,12 +767,16 @@ servidor local sem mexer no arquivo que vai junto com o site.
 
 ### Limites que valem saber
 
-- O envio é `POST` com `mode: 'no-cors'`, porque o Apps Script não devolve cabeçalhos
-  CORS nesse caminho. Isso significa que o navegador **não consegue ler a resposta**:
-  se a URL estiver errada, o botão de teste só avisa que a chamada saiu. Quem confirma
-  a gravação é a aba `Registro` do script. Já a **leitura** usa um `GET` comum, que o
-  Apps Script devolve com `Access-Control-Allow-Origin: *` e portanto chega na tela de
-  verdade, com o erro legível se algo estiver errado.
+- O envio é `POST` com `mode: 'no-cors'`. Isso é **escolha, não limitação**: o
+  ContentService do Apps Script responde o POST com `Access-Control-Allow-Origin: *`
+  (verificado), mas o `no-cors` não sofre com preflight nem com navegador antigo, então
+  o caminho do pedido nunca depende de cabeçalho nenhum. O preço é que o navegador
+  **não lê a resposta**: se a URL estiver errada, o botão de teste só avisa que a chamada
+  saiu. Quem confirma a gravação é a aba `Registro` do script.
+- **Exceção, de propósito:** a ação **Zerar pedidos** usa um segundo caminho
+  (`postarLendo`) em `cors`, porque apagar é sem volta e o dono precisa ver quantas
+  linhas caíram e ler o erro quando a frase de confirmação estiver errada. Sem isso o
+  botão seria às cegas — o pior jeito de apagar um histórico.
 - Free do Google: 20 mil células por dia numa conta, bem acima do volume de uma
   lanchonete. O limite real costuma ser o do próprio navegador.
 - **`file://` não funciona com planilha nenhuma.** Abrir a pasta com dois cliques

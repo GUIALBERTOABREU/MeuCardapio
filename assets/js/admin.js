@@ -860,10 +860,16 @@
   function ligarPlanilha() {
     var P = window.CardapioPlanilha;
 
+    /* Tem que ser a MESMA frase do planilha.gs (FRASE_LIMPAR). O
+       script compara o texto exato, entao os dois lados precisam
+       concordar — e nenhum dos dois aceita o que vier trocado. */
+    var FRASE_LIMPAR = 'apagar tudo';
+
     if (!P) {
       el.btnEnviarCardapio.disabled = true;
       el.btnTestarPlanilha.disabled = true;
       el.btnLerPlanilha.disabled = true;
+      if (el.btnLimparPedidos) el.btnLimparPedidos.disabled = true;
       return;
     }
 
@@ -958,6 +964,71 @@
         el.resultadoPlanilha.textContent = erro.message;
       });
     });
+
+    /* ---------- zerar pedidos ----------
+       Botao so habilita quando a frase bate exatamente, e ainda
+       assim pede um "sim" no confirm() do navegador: sao duas
+       camadas, porque aqui nao tem como desfazer. */
+    function conferirFrase() {
+      var botao = el.btnLimparPedidos;
+      if (!botao) return;
+
+      var ok = el.limparFrase.value.trim() === FRASE_LIMPAR;
+      botao.disabled = !ok;
+      el.limparAviso.textContent = ok ? 'Pode apertar o botão abaixo.' : '';
+    }
+
+    if (el.limparFrase) {
+      el.limparFrase.addEventListener('input', conferirFrase);
+      conferirFrase();
+    }
+
+    if (el.btnLimparPedidos) {
+      el.btnLimparPedidos.addEventListener('click', function () {
+        if (!P.configurada()) return semUrl();
+
+        var botao = el.btnLimparPedidos;
+        var aviso = el.limparAviso;
+        var frase = el.limparFrase.value.trim();
+
+        if (frase !== FRASE_LIMPAR) {
+          aviso.textContent = 'Digite "' + FRASE_LIMPAR + '" para liberar o botão.';
+          return;
+        }
+
+        if (!window.confirm(
+          'Isto apaga TODOS os pedidos e TODOS os itens das abas Pedidos e Itens.\n\n' +
+          'O cardápio, bairros, opções e configurações ficam como estão.\n\n' +
+          'Não dá para desfazer pelo painel. Quer continuar?'
+        )) {
+          aviso.textContent = 'Cancelado. Nada foi apagado.';
+          return;
+        }
+
+        botao.disabled = true;
+        aviso.textContent = 'Apagando…';
+
+        P.limparPedidos(frase).then(function (r) {
+          var quantos = (r && r.apagados) || {};
+          var nPed = quantos.Pedidos || 0;
+          var nItem = quantos.Itens || 0;
+
+          aviso.textContent = nPed || nItem
+            ? 'Pronto: ' + nPed + ' pedido(s) e ' + nItem + ' item(ns) apagados.'
+            : 'A planilha já estava sem pedidos.';
+
+          el.limparFrase.value = '';
+          conferirFrase();
+
+          /* A lista de pedidos na tela e o cardapio local nao mudaram,
+             so a planilha. Recarrega para o painel mostrar a verdade. */
+          avisar('Pedidos apagados 🧹', 'ok');
+        }, function (erro) {
+          botao.disabled = false;
+          aviso.textContent = erro.message || 'Não deu para apagar.';
+        });
+      });
+    }
   }
 
   /* =========================================================
@@ -1405,6 +1476,9 @@
       btnLerPlanilha: $('#btnLerPlanilha'),
       btnTestarPlanilha: $('#btnTestarPlanilha'),
       resultadoPlanilha: $('#resultadoPlanilha'),
+      limparFrase: $('#limparFrase'),
+      btnLimparPedidos: $('#btnLimparPedidos'),
+      limparAviso: $('#limparAviso'),
       avisoPublicar: $('#avisoPublicar'),
       avisoSite: $('#avisoSite')
     };

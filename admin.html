@@ -7,7 +7,7 @@
   <title>Painel do Cardápio</title>
   <meta name="description" content="Área do dono: edite itens, preços e categorias, e exporte o cardápio em JSON.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚙️</text></svg>">
-  <link rel="stylesheet" href="assets/css/style.css?v=20261004f">
+  <link rel="stylesheet" href="assets/css/style.css?v=20261004g">
 </head>
 <body>
 
@@ -223,6 +223,31 @@
         </div>
 
         <div class="painel">
+          <div class="painel-topo"><h2>Zerar pedidos</h2></div>
+          <p class="dica" style="margin:0 0 14px;color:var(--texto-suave);font-size:.88rem">
+            Apaga <strong>todos</strong> os pedidos e todos os itens das abas
+            <code>Pedidos</code> e <code>Itens</code>, para começar do zero sem
+            números repetidos nem itens órfãos no relatório. O cabeçalho das
+            abas é preservado e o relatório de vendas é recalculado na hora.
+            <br><br>
+            O cardápio, os bairros, as opções e as configurações <strong>não</strong>
+            são tocados. <strong>Não dá para desfazer</strong> pelo painel — só pelo
+            histórico de versões do Google Sheets.
+          </p>
+          <div class="campo">
+            <label for="limparFrase">Digite <code>apagar tudo</code> para liberar o botão</label>
+            <input type="text" id="limparFrase" autocomplete="off" spellcheck="false"
+                   placeholder="apagar tudo">
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center">
+            <button type="button" class="btn btn-perigo" id="btnLimparPedidos" disabled>
+              🗑 Apagar todos os pedidos
+            </button>
+            <span id="limparAviso" class="dica" role="status" style="font-size:.88rem"></span>
+          </div>
+        </div>
+
+        <div class="painel">
           <div class="painel-topo"><h2>Segurança</h2></div>
           <p class="dica" style="margin:0 0 14px;color:var(--texto-suave);font-size:.88rem">
             A senha é guardada apenas neste navegador. Em arquivos estáticos não existe servidor
@@ -315,9 +340,9 @@
     </div>
   </div>
 
-  <script src="assets/js/planilha-site.js?v=20261004f"></script>
-  <script src="assets/js/store.js?v=20261004f"></script>
-  <script src="assets/js/planilha.js?v=20261004f"></script>
-  <script src="assets/js/admin.js?v=20261004f"></script>
+  <script src="assets/js/planilha-site.js?v=20261004g"></script>
+  <script src="assets/js/store.js?v=20261004g"></script>
+  <script src="assets/js/planilha.js?v=20261004g"></script>
+  <script src="assets/js/admin.js?v=20261004g"></script>
 </body>
 </html>

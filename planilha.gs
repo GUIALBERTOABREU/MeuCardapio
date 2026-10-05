@@ -87,6 +87,11 @@ var ABA_ITENS = 'Itens';
    defasado em relacao as abas Pedidos/Itens. */
 var ABA_RELATORIO = 'Relatorio';
 
+/* Frase que o painel tem que devolver para a limpeza ser aceita.
+   Apagar pedido e nao tem volta, entao o botao so fica disponivel
+   com o token E com esta frase exata. */
+var FRASE_LIMPAR = 'apagar tudo';
+
 /* ------------------------------------------------------------------
    Recebe o POST do navegador
    ------------------------------------------------------------------ */
@@ -113,6 +118,12 @@ function doPost(e) {
     var spec = abas[0];
     var resultado = alterarStatusPedido(spec.pedido, spec.status);
     return responder(resultado);
+  }
+
+  /* Ação limpar: apaga pedidos e itens. Precisa da frase de
+     confirmação, senão qualquer POST valido apagaria o historico. */
+  if (dados.acao === 'limpar') {
+    return responder(limparPedidos(dados.confirmacao));
   }
 
   var abas = dados.abas;
@@ -622,6 +633,69 @@ function alterarStatusPedido(pedido, novoStatus) {
   }
 
   return { ok: false, erro: 'Pedido ' + pedido + ' não encontrado.' };
+}
+
+/**
+ * Apaga todos os pedidos e todos os itens, para o dono começar do zero.
+ *
+ * É uma ação destrutiva, então exige DUAS coisas: o token (que o
+ * doPost já cobra de toda escrita) e a frase de confirmação exata
+ * vinda do painel. Um clique sozinho não apaga nada — o painel só
+ * envia a frase depois de o dono ver um "digite para confirmar".
+ *
+ * Apaga as linhas 2..N e MANTÉM a linha 1 (cabeçalho) e a formatação,
+ * ao contrário do `replace` (que usa clearContents e perderia o
+ * negrito, a largura das colunas e a formatação de dinheiro).
+ *
+ * A aba Relatorio é reconstruida na hora: ela é só conta, não dado.
+ * Sem isso, a tela mostraria o total dos pedidos apagados até o
+ * próximo pedido entrar.
+ */
+function limparPedidos(confirmacao) {
+  /* Comparação exata, sem tolerar caixa nem espaço sobrando: a frase
+     é longa de propósito, para o painel não aceitar por engano. */
+  if (confirmacao !== FRASE_LIMPAR) {
+    return {
+      ok: false,
+      erro: 'Confirmação incorreta. Nada foi apagado.'
+    };
+  }
+
+  var apagados = {};
+  var planilha = SpreadsheetApp.getActiveSpreadsheet();
+
+  try {
+    /* getSheetByName e nao abaOuCriar: nao faz sentido criar uma aba
+       que o dono nunca teve, porque ela nasceria sem cabecalho e o
+       painel mostraria uma aba nova e vazia no meio da planilha. */
+    apagados[ABA_PEDIDOS] = apagarDados(planilha, ABA_PEDIDOS);
+    apagados[ABA_ITENS] = apagarDados(planilha, ABA_ITENS);
+
+    /* A conta precisa bater com o que sobrou, e não com o histórico. */
+    gerarRelatorio();
+  } catch (erro) {
+    registrar('erro', 'limpar: ' + erro.message);
+    return { ok: false, erro: erro.message, apagados: apagados };
+  }
+
+  registrar('limpar', 'apagados ' + apagados[ABA_PEDIDOS] + ' pedido(s) e ' +
+    apagados[ABA_ITENS] + ' item(ns)');
+
+  return { ok: true, apagados: apagados };
+}
+
+/* Apaga as linhas de dados de uma aba e devolve quantas foram.
+ * Devolve 0 quando a aba não existe ou já está só com o cabeçalho —
+ * limpar duas vezes não pode dar erro. */
+function apagarDados(planilha, nome) {
+  var aba = planilha.getSheetByName(nome);
+  if (!aba) return 0;
+
+  var dados = aba.getLastRow() - 1;
+  if (dados < 1) return 0;
+
+  aba.deleteRows(2, dados);
+  return dados;
 }
 
 /* Acha o número da coluna pelo nome, ignorando acento e caixa. Assim
