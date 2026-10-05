@@ -1008,8 +1008,20 @@
         botao.disabled = true;
         aviso.textContent = 'Apagando…';
 
+        /* `postarLendo` RESOLVE com {ok:false, erro} quando o script
+           recusa - ele não rejeita. Sem este if, um script desatualizado
+           no Google entrava pelo caminho do sucesso e o dono via
+           "A planilha já estava sem pedidos" depois de o botão ter
+           sido pressionado. Num botão destrutivo, erro escondido é
+           pior que erro visível. */
         P.limparPedidos(frase).then(function (r) {
-          var quantos = (r && r.apagados) || {};
+          if (!r || r.ok !== true) {
+            botao.disabled = false;
+            aviso.textContent = 'NÃO APAGOU: ' + ((r && r.erro) || 'o script não respondeu.');
+            return;
+          }
+
+          var quantos = r.apagados || {};
           var nPed = quantos.Pedidos || 0;
           var nItem = quantos.Itens || 0;
 
@@ -1017,15 +1029,19 @@
             ? 'Pronto: ' + nPed + ' pedido(s) e ' + nItem + ' item(ns) apagados.'
             : 'A planilha já estava sem pedidos.';
 
+          /* Limpa o campo e trava o botão NA MAO. Chamar conferirFrase()
+             aqui sobrescreveria a frase de acerto com '' na mesma hora
+             (ela le o campo, já vazio) e o dono nunca leria o
+             resultado. */
           el.limparFrase.value = '';
-          conferirFrase();
+          botao.disabled = true;
 
           /* A lista de pedidos na tela e o cardapio local nao mudaram,
              so a planilha. Recarrega para o painel mostrar a verdade. */
           avisar('Pedidos apagados 🧹', 'ok');
         }, function (erro) {
           botao.disabled = false;
-          aviso.textContent = erro.message || 'Não deu para apagar.';
+          aviso.textContent = 'NÃO APAGOU: ' + (erro.message || 'falha de rede.');
         });
       });
     }
