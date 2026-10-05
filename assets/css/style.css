@@ -2,6 +2,15 @@
    style.css  —  cardapio digital
    ============================================================= */
 
+/* O atributo `hidden` precisa GANHAR do `display` dos componentes.
+   Sem esta regra, qualquer bloco com `display: flex/grid/block` no
+   CSS continua aparecendo mesmo com `elemento.hidden = true`, porque
+   a regra do autor vence a do navegador. Foi exatamente o que
+   aconteceu com o aviso de fechado: a lanchonete estava ABERTA
+   (`aberto = Sim` na planilha) e o cardapio ainda assim mandava
+   "Estamos fechados agora" para o cliente. */
+[hidden] { display: none !important; }
+
 :root {
   /* Faz os controles nativos (calendario do type=date, dropdown do
      select, barras de rolagem) seguirem o tema claro. */
@@ -47,7 +56,7 @@
      (--primaria-escura) e o unico que passa em 4.5:1. */
   --primaria-texto: var(--primaria-escura);
 
-  /* --- Paleta da marca Pastelaria do CAÊ ----------------------- */
+  /* --- Paleta da marca Ambuger do Ze --------------------------- */
   --marca-amarelo: #F5A623;
   --marca-amarelo-escuro: #D4891A;
   --marca-vermelho: #8B1A1A;
