@@ -1,0 +1,81 @@
+DOCUMENTAÇÃO COMPLETA - Cardápio Digital
+Implementação: Multi-Ingredientes (Opção C - Grupos + Remover + Adicionais com Preço)
+
+Data: 07/10/2026
+Versão: 2.0
+Status: Implementado, testado e documentado
+
+================================================
+
+1. VISÃO GERAL
+
+Implementação de personalização de produtos com:
+- Adicionais com preço (checkbox/radio)
+- Remoção de ingredientes sem custo
+- Observações livres
+- Cálculo em tempo real
+- 100% retrocompatível
+
+2. ARQUIVOS MODIFICADOS
+
+- cardapio.json: Adicionada personalizacao em X-TUDO, X-BACON, X-SALADA, X-FRANGO, X-EGG
+- index.html: Modal de personalização + CSS + JS (botão dinâmico, cálculo, variação única, toast mantido)
+- acompanhar.html: Exibição condicional (Removidos/Adicionais/Observações)
+- gerenciar.html: Exibição condicional + confirmação ao marcar como Entregue
+
+3. ESTRUTURA PRINCIPAL (JSON)
+
+personalizacao.permitir (bool)
+remover: { titulo, permitir, max, opcoes[] }
+adicionais[]: { titulo, tipo('checkbox'|'radio'), obrigatorio, min, max, opcoes:[{id,nome,preco}] }
+observacao: { permitir, placeholder }
+
+4. CÁLCULO DE PREÇO
+
+precoFinal = precoBase + soma(extras selecionados)
+Remoções NÃO alteram preço.
+
+5. CARRINHO/PEDIDO (localStorage)
+
+Item personalizado:
+{
+  id: "produto_timestamp_hash",
+  produtoId, nome,
+  precoBase, precoFinal, quantidade,
+  extras: [{nome, preco, qtd:1}],
+  removidos: [string],
+  observacao: string,
+  resumo: string (gerado automático)
+}
+
+6. EXIBIÇÃO CONDICIONAL
+
+Só exibe seções quando existirem conteúdo. Preserva pedidos antigos.
+
+7. RETROCOMPATIBILIDADE
+
+- Campos opcionais
+- Renderização condicional
+- Produtos sem personalizacao: botão "+ Adicionar" direto
+- Pedidos antigos: leitura normal sem erros
+
+8. ARQUIVOS DE DOCUMENTAÇÃO CRIADOS
+
+- DOCUMENTACAO_COMPLETA.md (técnica completa)
+- DOCUMENTACAO_PERSONALIZACAO.md (focado em personalização)
+- GUIA_USO_KITCHEN_CLIENTE.md (guia prático cliente/cozinha)
+- documentacao_completa.txt (este arquivo)
+
+9. TESTES RECOMENDADOS
+
+- Modal abre com "Personalizar"
+- Cálculo em tempo real correto
+- Variações separadas no carrinho
+- Produto sem personalizacao mantém comportamento original
+- Acompanhar/gerenciar exibem corretamente
+- Retrocompatibilidade com pedidos antigos
+- Confirmação Entregue (gerenciar)
+
+10. CONCLUSÃO
+
+Implementação Opção C completa, leve, vanilla, retrocompatível e pronta para uso.
