@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Estúdio Gerador de Playlist - Mídia Indoor</title>
+    <style>
+        :root { --primary: #2563eb; --success: #16a34a; --bg: #f8fafc; --text: #1e293b; }
+        body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); }
+        h1 { margin-top: 0; color: #0f172a; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; }
+        .drop-zone { border: 3px dashed #cbd5e1; padding: 30px; text-align: center; border-radius: 8px; background: #f1f5f9; cursor: pointer; transition: 0.2s; margin-bottom: 20px; }
+        .drop-zone:hover { border-color: var(--primary); background: #eff6ff; }
+        .form-group { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 10px; margin-bottom: 15px; align-items: end; }
+        label { font-size: 14px; font-weight: 600; display: block; margin-bottom: 5px; }
+        input, select, button { padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; font-size: 14px; }
+        button { cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-add { background: var(--primary); color: white; border: none; }
+        .btn-add:hover { background: #1d4ed8; }
+        .btn-del { background: #ef4444; color: white; border: none; padding: 10px 15px; }
+        .btn-del:hover { background: #dc2626; }
+        .btn-save { background: var(--success); color: white; border: none; width: 100%; padding: 14px; font-size: 16px; margin-top: 20px; }
+        .btn-save:hover { background: #15803d; }
+        .playlist-items { margin-top: 20px; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+        .item-card { display: flex; justify-content: space-between; align-items: center; background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid var(--primary); }
+        .item-info { flex: 1; margin-right: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .badge { background: #e2e8f0; padding: 3px 8px; border-radius: 12px; font-size: 12px; font-weight: bold; margin-left: 5px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎛️ Estúdio Gerador de Playlist</h1>
+    <p>Adicione URLs ou arraste arquivos locais para exibição em sua TV.</p>
+    
+    <div class="drop-zone" id="dropZone">
+        <strong>Arraste imagens ou vídeos curtos aqui</strong><br>ou clique para selecionar do computador (Conversão Offline Automática)
+        <input type="file" id="fileInput" style="display:none" accept="image/*,video/mp4">
+    </div>
+
+    <div class="form-group">
+        <div>
+            <label>URL da Mídia (Imagem, Vídeo ou Site)</label>
+            <input type="url" id="mediaUrl" placeholder="https://exemplo.com/imagem.jpg" style="width: 100%; box-sizing: border-box;">
+        </div>
+        <div>
+            <label>Tipo</label>
+            <select id="mediaType">
+                <option value="image">Imagem</option>
+                <option value="video">Vídeo (MP4)</option>
+                <option value="web">Página Web / Link</option>
+            </select>
+        </div>
+        <div>
+            <label>Turno / Exibição</label>
+            <select id="mediaSchedule">
+                <option value="all">O Dia Todo</option>
+                <option value="manha">Manhã (06h - 12h)</option>
+                <option value="tarde">Tarde (12h - 18h)</option>
+                <option value="noite">Noite (18h - 06h)</option>
+            </select>
+        </div>
+        <button class="btn-add" id="btnAdd">Adicionar</button>
+    </div>
+
+    <div class="form-group" style="grid-template-columns: 3fr 1fr auto;">
+        <div>
+            <label>Tempo Padrão de Exibição (Segundos)</label>
+            <input type="number" id="mediaDuration" value="15" min="2">
+        </div>
+    </div>
+
+    <div class="playlist-items">
+        <h3>📋 Itens da Programação Atual</h3>
+        <div id="itemsContainer"></div>
+    </div>
+
+    <button class="btn-save" id="btnSave">💾 Baixar Arquivo playlist.json</button>
+</div>
+
+<script>
+    let playlist = [];
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const itemsContainer = document.getElementById('itemsContainer');
+
+    dropZone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleFiles(e.target.files);
+    
+    dropZone.ondragover = (e) => { e.preventDefault(); dropZone.style.borderColor = '#2563eb'; };
+    dropZone.ondragleave = () => { dropZone.style.borderColor = '#cbd5e1'; };
+    dropZone.ondrop = (e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); };
+
+    function handleFiles(files) {
+        if (!files.length) return;
+        const file = files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('mediaUrl').value = e.target.result;
+            document.getElementById('mediaType').value = file.type.startsWith('video/') ? 'video' : 'image';
+        };
+        reader.readAsDataURL(file);
+    }
+
+    document.getElementById('btnAdd').onclick = () => {
+        const url = document.getElementById('mediaUrl').value;
+        const type = document.getElementById('mediaType').value;
+        const duration = parseInt(document.getElementById('mediaDuration').value) || 15;
+        const schedule = document.getElementById('mediaSchedule').value;
+
+        if(!url) return alert('Insira uma URL válida ou selecione um arquivo.');
+
+        playlist.push({ type, url, duration, schedule });
+        renderPlaylist();
+        document.getElementById('mediaUrl').value = '';
+    };
+
+    function removeDoc(index) {
+        playlist.splice(index, 1);
+        renderPlaylist();
+    }
+
+    function renderPlaylist() {
+        itemsContainer.innerHTML = playlist.length === 0 ? '<p style="color:#64748b;">Nenhuma mídia na grade.</p>' : '';
+        playlist.forEach((item, index) => {
+            const card = document.createElement('div');
+            card.className = 'item-card';
+            const isBase64 = item.url.startsWith('data:');
+            const displayName = isBase64 ? `Arquivo Local Offline (${item.type})` : item.url;
+            
+            card.innerHTML = `
+                <div class="item-info">
+                    <strong>#${index + 1}</strong> - ${displayName}
+                    <span class="badge">${item.type.toUpperCase()}</span>
+                    <span class="badge" style="background:#dbeafe; color:#1e40af;">${item.schedule.toUpperCase()}</span>
+                    <span class="badge" style="background:#dcfce7; color:#14532d;">${item.duration}s</span>
+                    \${isBase64 ? '<span class="badge" style="background:#ffedd5; color:#7c2d12;">OFFLINE</span>' : ''}
+                </div>
+                <button class="btn-del" onclick="removeDoc(\${index})">remover</button>
+            `;
+            itemsContainer.appendChild(card);
+        });
+    }
+
+    document.getElementById('btnSave').onclick = () => {
+        if(playlist.length === 0) return alert('Sua playlist está vazia!');
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(playlist, null, 2));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute("href", dataStr);
+        downloadAnchor.setAttribute("download", "playlist.json");
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    };
+</script>
+</body>
+</html>

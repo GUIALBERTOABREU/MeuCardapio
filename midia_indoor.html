@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player de Mídia Indoor Otimizado</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: Arial, sans-serif; }
+        
+        /* Estrutura de Layout Geral */
+        #screenWrapper { display: flex; width: 100%; height: calc(100% - 60px); position: relative; }
+        
+        /* Área Principal do Player */
+        #playerContainer { width: 100%; height: 100%; position: relative; background: #000; transition: width 0.3s ease; }
+        
+        /* Menu Lateral Fixo (Layout Dividido 30%) */
+        #sideMenu { width: 0%; height: 100%; background: #1e293b; color: white; display: none; box-sizing: border-box; padding: 20px; border-left: 4px solid #dc2626; overflow: hidden; transition: width 0.3s ease; flex-direction: column; }
+        #sideMenu h2 { margin-top: 0; color: #ef4444; border-bottom: 2px solid #334155; padding-bottom: 10px; font-size: 24px; }
+        #sideContent { font-size: 18px; line-height: 1.6; white-space: pre-line; }
+
+        /* Classes de ativação do layout dividido */
+        body.split-layout #playerContainer { width: 70%; }
+        body.split-layout #sideMenu { width: 30%; display: flex; }
+
+        /* Elementos das mídias rotativas */
+        .media-node { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; transition: opacity 0.8s ease-in-out; display: none; object-fit: contain; border: none; }
+        .media-node.active { opacity: 1; display: block; }
+
+        /* Logotipo Flutuante Customizável */
+        #brandLogo { position: absolute; max-width: 180px; max-height: 80px; z-index: 999; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.7)); display: none; }
+        .logo-top-right { top: 20px; right: 20px; }
+        .logo-top-left { top: 20px; left: 70px; }
+        .logo-bottom-right { bottom: 20px; right: 20px; }
+        .logo-bottom-left { bottom: 20px; left: 20px; }
+
+        /* Barra de Notícias e Widgets */
+        #bottomTicker { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; background: #111; border-top: 3px solid #dc2626; display: flex; align-items: center; z-index: 1000; color: white; }
+        #tickerNews { flex: 1; overflow: hidden; white-space: nowrap; font-size: 20px; font-weight: bold; background: #1a1a1a; height: 100%; display: flex; align-items: center; }
+        .marquee-text { display: inline-block; padding-left: 100%; animation: marquee 35s linear infinite; }
+        #tickerWidget { width: 320px; background: #dc2626; height: 100%; display: flex; align-items: center; justify-content: space-around; font-weight: bold; font-size: 18px; box-shadow: -4px 0 10px rgba(0,0,0,0.3); }
+
+        @keyframes marquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
+
+        /* Controle administrativo */
+        #configTrigger { position: absolute; top: 15px; left: 15px; z-index: 1001; background: rgba(0,0,0,0.5); border: none; color: white; font-size: 24px; padding: 10px; border-radius: 50%; cursor: pointer; transition: 0.3s; }
+        #configTrigger:hover { background: #dc2626; }
+        #adminPanel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); z-index: 1002; display: flex; align-items: center; justify-content: center; color: white; overflow-y: auto; padding: 20px 0; }
+        .panel-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 550px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); box-sizing: border-box; }
+        .panel-content h2 { margin-top: 0; color: #3b82f6; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+        .input-box { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #475569; background: #0f172a; color: white; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        .btn-action { background: #2563eb; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; }
+        .btn-action:hover { background: #1d4ed8; }
+        .btn-danger { background: #ef4444; margin-top: 15px; }
+        .btn-danger:hover { background: #dc2626; }
+
+        /* Toast Popup Notificação */
+        #updateToast { position: absolute; bottom: 80px; left: 20px; background: #16a34a; color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1010; opacity: 0; transform: translateY(20px); transition: opacity 0.4s, transform 0.4s; display: none; }
+        #updateToast.show { display: block; opacity: 1; transform: translateY(0); }
+    </style>
+</head>
+<body>
+
+<button id="configTrigger" onclick="openAdminWithPassword()">⚙️</button>
+<img id="brandLogo" src="" alt="Logo" class="logo-top-right">
+
+<!-- Toast de Notificação -->
+<div id="updateToast">🔄 Playlist atualizada com sucesso!</div>
+
+<!-- Painel Administrativo -->
+<div id="adminPanel">
+    <div class="panel-content">
+        <h2>📺 Configuração Avançada da Tela</h2>
+        
+        <label>Definir Nova Senha de Acesso</label>
+        <input type="password" id="adminPassword" class="input-box" placeholder="Deixe em branco para manter a atual">
+
+        <label>URL Remota da Playlist (JSON)</label>
+        <input type="url" id="remoteJsonUrl" class="input-box" placeholder="https://seu-servidor.com/playlist.json">
+        
+        <label>Logotipo da Empresa (Link URL ou código Base64 para Offline)</label>
+        <input type="text" id="logoUrl" class="input-box" placeholder="https://... ou data:image/png;base64,...">
+
+        <div class="row">
+            <div>
+                <label>Posição do Logotipo</label>
+                <select id="logoPosition" class="input-box">
+                    <option value="logo-top-right">Superior Direito</option>
+                    <option value="logo-top-left">Superior Esquerdo</option>
+                    <option value="logo-bottom-right">Inferior Direito</option>
+                    <option value="logo-bottom-left">Inferior Esquerdo</option>
+                </select>
+            </div>
+            <div>
+                <label>Layout da Tela</label>
+                <select id="layoutMode" class="input-box">
+                    <option value="full">Tela Cheia Tradicional (100%)</option>
+                    <option value="split">Layout Dividido (70% Mídia / 30% Menu)</option>
+                </select>
+            </div>
+        </div>
+
+        <label>Texto do Menu Lateral Fixo (Caso ativado)</label>
+        <textarea id="sideMenuText" class="input-box" rows="2" placeholder="Digite ofertas ou comunicados aqui..."></textarea>
+
+        <div class="row">
+            <div>
+                <label>Canal de Notícias</label>
+                <select id="newsTopic" class="input-box">
+                    <option value="https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/rss2.xml">Notícias Gerais (G1)</option>
+                    <option value="https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/economia/rss2.xml">Economia (G1)</option>
+                    <option value="https://api.allorigins.win/raw?url=https://ge.globo.com/dynamo/rss2.xml">Esportes (GE)</option>
+                    <option value="https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/tecnologia/rss2.xml">Tecnologia</option>
+                </select>
+            </div>
+            <div>
+                <label>Sincronização Remota</label>
+                <select id="refreshInterval" class="input-box">
+                    <option value="900000">A cada 15 min</option>
+                    <option value="3600000" selected>A cada 1 hora</option>
+                    <option value="7200000">A cada 2 horas</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-action" onclick="saveSettings()">Salvar e Aplicar Alterações</button>
+        <button class="btn-action btn-danger" onclick="factoryReset()">⚠️ Limpar Tudo e Reiniciar</button>
+    </div>
+</div>
+
+<!-- Estrutura Visual Principal -->
+<div id="screenWrapper">
+    <div id="playerContainer">
+        <img id="imgPlayer" class="media-node" src="" alt="Imagem">
+        <video id="vidPlayer" class="media-node" muted playsinline></video>
+        <iframe id="webPlayer" class="media-node" src=""></iframe>
+    </div>
+    
+    <div id="sideMenu">
+        <h2 id="sideMenuTitle">Destaques</h2>
+        <div id="sideContent">Carregando informativos...</div>
+    </div>
+</div>
+
+<!-- Rodapé Informativo -->
+<div id="bottomTicker">
+    <div id="tickerNews">
+        <div class="marquee-text" id="newsContainer">Sincronizando as principais informações do sistema...</div>
+    </div>
+    <div id="tickerWidget">
+        <span id="txtClima">☀️ 28°C</span>
+        <span id="txtRelogio">00:00:00</span>
+    </div>
+</div>
+
+<script>
+    let playlist = [];
+    let currentIndex = -1;
+    let mainTimer = null;
+
+    window.onload = function() {
+        loadSettings();
+        updateClock();
+        setInterval(updateClock, 1000);
+        setupTicker();
+    };
+
+    function updateClock() {
+        const agora = new Date();
+        document.getElementById('txtRelogio').innerText = agora.toLocaleTimeString('pt-BR');
+    }
+
+    function openAdminWithPassword() {
+        const savedPassword = localStorage.getItem('indoor_password') || '1234';
+        const typedPassword = prompt('Digite a senha administrativa para acessar as configurações:');
+        if (typedPassword === savedPassword) {
+            document.getElementById('adminPanel').style.display = 'flex';
+        } else if (typedPassword !== null) {
+            alert('Senha incorreta!');
+        }
+    }
+
+    function toggleAdmin() {
+        const panel = document.getElementById('adminPanel');
+        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function saveSettings() {
+        const newPass = document.getElementById('adminPassword').value;
+        if(newPass.trim() !== "") {
+            localStorage.setItem('indoor_password', newPass);
+        }
+        
+        localStorage.setItem('indoor_json_url', document.getElementById('remoteJsonUrl').value);
+        localStorage.setItem('indoor_logo_url', document.getElementById('logoUrl').value);
+        localStorage.setItem('indoor_logo_pos', document.getElementById('logoPosition').value);
+        localStorage.setItem('indoor_layout_mode', document.getElementById('layoutMode').value);
+        localStorage.setItem('indoor_side_text', document.getElementById('sideMenuText').value);
+        localStorage.setItem('indoor_news_topic', document.getElementById('newsTopic').value);
+        localStorage.setItem('indoor_refresh_time', document.getElementById('refreshInterval').value);
+        
+        document.getElementById('adminPassword').value = '';
+        toggleAdmin();
+        applyVisualChanges();
+        syncPlaylist();
+        setupTicker();
+    }
+
+    function loadSettings() {
+        document.getElementById('remoteJsonUrl').value = localStorage.getItem('indoor_json_url') || '';
+        document.getElementById('logoUrl').value = localStorage.getItem('indoor_logo_url') || '';
+        document.getElementById('logoPosition').value = localStorage.getItem('indoor_logo_pos') || 'logo-top-right';
+        document.getElementById('layoutMode').value = localStorage.getItem('indoor_layout_mode') || 'full';
+        document.getElementById('sideMenuText').value = localStorage.getItem('indoor_side_text') || 'Confiram nossas soluções exclusivas de Mídia Indoor offline!';
+        document.getElementById('newsTopic').value = localStorage.getItem('indoor_news_topic') || 'https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/rss2.xml';
+        
+        applyVisualChanges();
+        
+        const localSaved = localStorage.getItem('indoor_cached_playlist');
+        if(localSaved) {
+            playlist = JSON.parse(localSaved);
+            startPlaybackFlow();
+        }
+        
+        if(localStorage.getItem('indoor_json_url')) {
+            syncPlaylist();
+            setInterval(syncPlaylist, parseInt(localStorage.getItem('indoor_refresh_time')) || 3600000);
+        }
+    }
+
+    function applyVisualChanges() {
+        const logo = localStorage.getItem('indoor_logo_url');
+        const pos = localStorage.getItem('indoor_logo_pos') || 'logo-top-right';
+        const imgEl = document.getElementById('brandLogo');
+        
+        imgEl.className = '';
+        imgEl.classList.add(pos);
+        
+        if(logo && logo.trim() !== "") { 
+            imgEl.src = logo; 
+            imgEl.style.display = 'block'; 
+        } else { 
+            imgEl.style.display = 'none'; 
+        }
+
+        const layout = localStorage.getItem('indoor_layout_mode') || 'full';
+        const sideText = localStorage.getItem('indoor_side_text') || '';
+        
+        if(layout === 'split') {
+            document.body.classList.add('split-layout');
+            document.getElementById('sideContent').innerText = sideText;
+        } else {
+            document.body.classList.remove('split-layout');
+        }
+    }
+
+    async function syncPlaylist() {
+        const url = localStorage.getItem('indoor_json_url');
+        if(!url) return;
+        try {
+            const res = await fetch(url + '?nocache=' + new Date().getTime());
+            const data = await res.json();
+            if(Array.isArray(data)) {
+                playlist = data;
+                localStorage.setItem('indoor_cached_playlist', JSON.stringify(data));
+                showToast();
+                if(currentIndex === -1) startPlaybackFlow();
+            }
+        } catch(err) {
+            console.error("Falha na sincronização online. Mantendo mídias locais seguras.", err);
+        }
+    }
+
+    function showToast() {
+        const toast = document.getElementById('updateToast');
+        toast.classList.add('show');
+        setTimeout(() => {
+            toast.classList.remove('show');
+        }, 4000);
+    }
+
+    function factoryReset() {
+        if(confirm('Tem certeza de que deseja apagar TODOS os dados, senhas, mídias e caches salvos nesta TV?')) {
+            localStorage.clear();
+            alert('Sistema totalmente limpo. A página será reiniciada.');
+            window.location.reload();
+        }
+    }
+
+    function checkTurn(schedule) {
+        if (!schedule || schedule === 'all') return true;
+        const hora = new Date().getHours();
+        if (schedule === 'manha' && hora >= 6 && hora < 12) return true;
+        if (schedule === 'tarde' && hora >= 12 && hora < 18) return true;
+        if (schedule === 'noite' && (hora >= 18 || hora < 6)) return true;
+        return false;
+    }
+
+    function startPlaybackFlow() {
+        if(!playlist.length) return;
+        clearTimeout(mainTimer);
+        
+        let attempts = 0;
+        do {
+            currentIndex = (currentIndex + 1) % playlist.length;
+            attempts++;
+        } while(!checkTurn(playlist[currentIndex].schedule) && attempts <= playlist.length);
+
+        displayMedia(playlist[currentIndex]);
+    }
+
+    function clearActiveMedia() {
+        document.querySelectorAll('.media-node').forEach(node => {
+            node.classList.remove('active');
+            if(node.tagName === 'VIDEO') node.pause();
+        });
+    }
+
+    function displayMedia(item) {
+        clearActiveMedia();
+        let fallbackTimer = setTimeout(startPlaybackFlow, 2000); 
+
+        if(item.type === 'image') {
+            const img = document.getElementById('imgPlayer');
+            img.src = item.url;
+            img.onload = () => { clearTimeout(fallbackTimer); img.classList.add('active'); mainTimer = setTimeout(startPlaybackFlow, item.duration * 1000); };
+            img.onerror = () => startPlaybackFlow();
+        } 
+        else if(item.type === 'video') {
+            const vid = document.getElementById('vidPlayer');
+            vid.src = item.url;
+            vid.oncanplaythrough = () => { 
+                clearTimeout(fallbackTimer); 
+                vid.classList.add('active'); 
+                vid.play().catch(() => {});
+                vid.onended = startPlaybackFlow;
+            };
+            vid.onerror = () => startPlaybackFlow();
+        } 
+        else if(item.type === 'web') {
+            const web = document.getElementById('webPlayer');
+            web.src = item.url;
+            web.onload = () => { clearTimeout(fallbackTimer); web.classList.add('active'); mainTimer = setTimeout(startPlaybackFlow, item.duration * 1000); };
+            web.onerror = () => startPlaybackFlow();
+        }
+    }
+
+    async function setupTicker() {
+        const feedUrl = localStorage.getItem('indoor_news_topic') || 'https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/rss2.xml';
+        const container = document.getElementById('newsContainer');
+        
+        try {
+            const response = await fetch(feedUrl);
+            const textData = await response.text();
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(textData, "text/xml");
+            const items = xmlDoc.getElementsByTagName("item");
+            
+            let headlines = [];
+            for (let i = 0; i < Math.min(items.length, 10); i++) {
+                const title = items[i].getElementsByTagName("title").textContent || items[i].getElementsByTagName("title")[0].innerHTML;
+                headlines.push(title);
+            }
+            container.innerText = headlines.join("   •   ") + "   •   ";
+        } catch (e) {
+            container.innerText = "Informativo: Programação e campanhas rodando em modo contínuo de contingência local.";
+        }
+    }
+</script>
+</body>
+</html>
