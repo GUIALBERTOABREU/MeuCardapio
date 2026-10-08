@@ -1237,6 +1237,16 @@ function aplicarPrecosConfig(aba) {
  * necessário montar =HIPERLINK() e aí quebrava se a URL tivesse
  * aspas ou espaços.
  */
+/**
+ * A coluna "Link da imagem" vira hyperlink de verdade. setValues
+ * deixa a URL como texto simples, e no Sheets texto simples só
+ * fica clicável depois que alguém digita Enter na célula. Isso
+ * aqui já deixa pronto para clicar direto.
+ *
+ * richTextValues é o que faz a parte clicável. Sem ele, seria
+ * necessário montar =HIPERLINK() e aí quebrava se a URL tivesse
+ * aspas ou espaços.
+ */
 function aplicarLinksImagem(aba, cabecalho) {
   var coluna = cabecalho.indexOf('Link da imagem') + 1;
   if (!coluna) return;
@@ -1244,33 +1254,37 @@ function aplicarLinksImagem(aba, cabecalho) {
   var ultima = aba.getLastRow();
   if (ultima < 2) return;
 
-  var valores = aba.getRange(2, coluna, ultima - 1, 1)
-                  .getValues()
-                  .map(function (l) { return l[0]; });
+  var range = aba.getRange(2, coluna, ultima - 1, 1);
+  var valores = range.getValues();
 
-  var texto = [];
-  var link = [];
+  var richArr = [];
+  var temLinkValido = false;
 
   for (var i = 0; i < valores.length; i++) {
-    var url = String(valores[i] === null ? '' : valores[i]).trim();
+    var cel = valores[i][0];
+    var url = String(cel === null || cel === undefined ? '' : cel).trim();
 
-    if (!url || !/^https?:\/\/\S+$/i.test(url)) {
-      texto.push('');
-      link.push('');
-      continue;
+    if (url && /^https?:\/\/\S+$/i.test(url)) {
+      // Link válido → cria RichText com hyperlink
+      richArr.push([{
+        text: url,
+        textLink: { url: url }
+      }]);
+      temLinkValido = true;
+    } else {
+      // Sem link válido → RichText vazio (sem hyperlink)
+      richArr.push([{
+        text: '',
+        textLink: null
+      }]);
     }
-
-    texto.push(url);
-    link.push(url);
   }
 
-  aba.getRange(2, coluna, ultima - 1, 1)
-     .setRichTextValues(texto.map(function (t, i) {
-       return [{
-         text: t,
-         textLink: link[i] ? { url: link[i] } : null
-       }];
-     }));
+  // Só aplica se tiver pelo menos um link válido.
+  // Isso evita o erro de assinatura quando todos estão vazios.
+  if (temLinkValido) {
+    range.setRichTextValues(richArr);
+  }
 }
 
 /* ------------------------------------------------------------------
