@@ -1,0 +1,33 @@
+function buscarPedidos(silencioso) {
+        if (!P || !P.configurada()) {
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">⚠️</span><p>Planilha não configurada. Conecte o Google Sheets primeiro.</p></div>');
+          return;
+        }
+
+        if (!silencioso) {
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">⏳</span><p>Buscando pedidos...</p></div>');
+        }
+
+        P.lerPedidos().then(function (resp) {
+          if (!resp || resp.ok !== true) {
+            pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">❌</span><p>' +
+              esc((resp && resp.erro) || 'Não foi possível carregar os pedidos.') + '</p></div>');
+            return;
+          }
+          pedidos = resp.pedidos || [];
+          renderPedidos();
+          el.atualizadoEm.textContent = 'Atualizado às ' + new Date().toLocaleTimeString('pt-BR');
+        }).catch(function (erro) {
+          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">❌</span><p>Erro ao buscar pedidos: ' + esc(erro && erro.message ? erro.message : erro) + '</p></div>');
+        });
+      }
+
+      /* Atualizacao automatica: nao interrompe quem esta mexendo na
+         lista (ex.: escolhendo um status) nem rouba o foco. */
+      function atualizarAutomatico() {
+        var ativo = document.activeElement;
+        if (ativo && el.pedidosLista.contains(ativo)) return;
+        buscarPedidos(true);
+      }
+
+      
