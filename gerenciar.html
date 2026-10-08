@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="assets/css/style.css?v=20261004m">
   <style>
     .gerenciar-container {
-      max-width: 1200px;
+      max-width: 1400px;
       margin: 0 auto;
       padding: 20px 16px;
     }
@@ -44,127 +44,181 @@
       min-width: 200px;
     }
 
-    .pedidos-lista {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .pedido-card {
-      background: var(--superficie);
-      border: 1px solid var(--borda);
-      border-radius: var(--raio);
-      padding: 16px;
+    .kanban {
       display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 16px;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
       align-items: start;
     }
 
-    .pedido-info {
+    .kanban-coluna {
+      background: var(--superficie-2);
+      border: 1px solid var(--borda);
+      border-radius: var(--raio);
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 220px);
+      overflow: hidden;
+    }
+
+    .kanban-cabecalho {
+      padding: 10px 12px;
+      font-weight: 800;
+      font-size: .9rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--borda);
+      background: var(--superficie);
+      border-radius: var(--raio) var(--raio) 0 0;
+    }
+
+    .kanban-contagem {
+      background: var(--borda);
+      color: var(--texto-suave);
+      font-size: .75rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .kanban-pedidos {
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .kanban-pedido {
+      background: var(--superficie);
+      border: 1px solid var(--borda);
+      border-radius: var(--raio-sm);
+      padding: 10px 12px;
       display: flex;
       flex-direction: column;
       gap: 8px;
+      box-shadow: 0 1px 2px rgba(0,0,0,.02);
     }
 
-    .pedido-numero {
-      font-size: 1.1rem;
+    .kanban-pedido-cabecalho {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .kanban-pedido-numero {
       font-weight: 800;
+      font-size: .95rem;
       color: var(--primaria-texto);
     }
 
-    .pedido-detalhes {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 8px;
-      font-size: .85rem;
+    .kanban-pedido-hora {
+      font-size: .75rem;
+      color: var(--texto-tenue);
     }
 
-    .pedido-detalhes span {
+    .kanban-linha {
+      font-size: .8rem;
+      color: var(--texto-suave);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .kanban-linha strong {
+      color: var(--texto);
+    }
+
+    .kanban-itens-resumo {
+      font-size: .8rem;
+      color: var(--texto);
+      background: var(--superficie-2);
+      border-radius: var(--raio-sm);
+      padding: 6px 8px;
+      line-height: 1.4;
+    }
+
+    .kanban-acoes {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .btn-xs {
+      padding: 6px 10px;
+      font-size: .8rem;
+      border-radius: var(--raio-sm);
+    }
+
+    .pedido-detalhes-exp {
+      display: none;
+      flex-direction: column;
+      gap: 8px;
+      padding-top: 6px;
+      border-top: 1px dashed var(--borda);
+    }
+
+    .pedido-detalhes-exp.aberto {
+      display: flex;
+    }
+
+    .detalhe-bloco {
+      background: var(--superficie-2);
+      border-radius: var(--raio-sm);
+      padding: 8px 10px;
+      font-size: .8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detalhe-linha {
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .detalhe-linha strong {
+      color: var(--texto);
+    }
+
+    .personalizacao-bloco {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      font-size: .78rem;
       color: var(--texto-suave);
     }
 
-    .pedido-detalhes strong {
-      color: var(--texto);
-      display: block;
-    }
-
-    .pedido-itens {
-      margin-top: 8px;
-      padding: 10px;
-      background: var(--superficie-2);
+    .personalizacao-item {
+      background: var(--superficie);
+      border: 1px solid var(--borda);
       border-radius: var(--raio-sm);
-      font-size: .85rem;
-    }
-
-    .pedido-itens ul {
-      margin: 0;
-      padding-left: 18px;
-    }
-
-    .pedido-acoes {
+      padding: 6px 8px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      align-items: flex-end;
+      gap: 2px;
     }
 
-    .status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      border-radius: 999px;
-      font-size: .8rem;
+    .personalizacao-titulo {
       font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: .03em;
-    }
-
-    .status-aguardando {
-      background: rgba(184, 134, 11, .15);
-      color: #8a6407;
-      border: 1px solid rgba(184, 134, 11, .35);
-    }
-
-    .status-preparando {
-      background: rgba(232, 89, 12, .12);
-      color: #c9480a;
-      border: 1px solid rgba(232, 89, 12, .3);
-    }
-
-    .status-preparado {
-      background: rgba(37, 211, 102, .12);
-      color: #1eb955;
-      border: 1px solid rgba(37, 211, 102, .3);
-    }
-
-    .status-saiu-entrega {
-      background: rgba(139, 26, 26, .12);
-      color: #8B1A1A;
-      border: 1px solid rgba(139, 26, 26, .3);
-    }
-
-    .status-entregue {
-      background: var(--sucesso-fundo);
-      color: var(--sucesso-texto);
-      border: 1px solid var(--sucesso-borda);
-    }
-
-    .status-select {
-      min-width: 160px;
+      color: var(--texto);
     }
 
     .pedido-vazio {
       text-align: center;
-      padding: 60px 20px;
+      padding: 40px 16px;
       color: var(--texto-suave);
     }
 
     .pedido-vazio-icone {
-      font-size: 3rem;
+      font-size: 2.4rem;
       display: block;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
     }
 
     .atualizado-em {
@@ -174,16 +228,24 @@
       margin-top: 16px;
     }
 
-    @media (max-width: 640px) {
-      .pedido-card {
+    @media (max-width: 1200px) {
+      .kanban {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      .kanban-coluna {
+        max-height: calc(100vh - 260px);
+      }
+    }
+
+    @media (max-width: 680px) {
+      .kanban {
         grid-template-columns: 1fr;
       }
-
-      .pedido-acoes {
-        flex-direction: row;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
+      .kanban-coluna {
+        max-height: none;
+      }
+      .kanban-pedidos {
+        max-height: 420px;
       }
     }
   </style>
@@ -222,7 +284,7 @@
       <button type="button" class="btn btn-primario" id="btnAtualizar">🔄 Atualizar</button>
     </div>
 
-    <div class="pedidos-lista" id="pedidosLista">
+    <div id="kanbanContainer">
       <div class="pedido-vazio">
         <span class="pedido-vazio-icone">📋</span>
         <p>Carregando pedidos...</p>
@@ -418,54 +480,135 @@
         });
 
         if (!filtrados.length) {
-          pintarLista('<div class="pedido-vazio"><span class="pedido-vazio-icone">📋</span><p>Nenhum pedido encontrado.</p></div>');
+          el.kanbanContainer.innerHTML = '<div class="pedido-vazio"><span class="pedido-vazio-icone">📋</span><p>Nenhum pedido encontrado.</p></div>';
           return;
         }
 
-        pintarLista(filtrados.map(function (p) {
-          /* O script devolve "Itens do pedido" como texto
-             ("1x X-Burguer (18.9) | ..."). Aceitamos também array,
-             caso o script passe a mandar estruturado. */
-          var itensLista = Array.isArray(p.itens)
+        var colunas = {
+          'Novo': [],
+          'Pendente': [],
+          'Aguardando': [],
+          'Preparando': [],
+          'Em Preparo': [],
+          'Preparado': [],
+          'Pronto': [],
+          'Saiu para entrega': [],
+          'Saiu p/ entrega': [],
+          'Saiu p/ Entrega': [],
+          'Concluído': [],
+          'Entregue': [],
+          'Cancelado': []
+        };
+
+        filtrados.forEach(function (p) {
+          var s = String(p.status || 'Pendente');
+          if (s === 'Novo' || s === 'Pendente' || s === 'Aguardando') colunas['Pendente'].push(p);
+          else if (s === 'Preparando' || s === 'Em Preparo') colunas['Em Preparo'].push(p);
+          else if (s === 'Preparado' || s === 'Pronto') colunas['Pronto'].push(p);
+          else if (s === 'Saiu para entrega' || s === 'Saiu p/ entrega' || s === 'Saiu p/ Entrega') colunas['Pronto'].push(p);
+          else if (s === 'Concluído' || s === 'Entregue') colunas['Entregue'].push(p);
+          else if (s === 'Cancelado') colunas['Pendente'].push(p);
+          else colunas['Pendente'].push(p);
+        });
+
+        function cardPedido(p) {
+          var itensBrutos = Array.isArray(p.itens)
             ? p.itens.map(function (i) {
-                return i.quantidade + 'x ' + i.nome + ' — ' + moeda(i.quantidade * i.precoUnitario);
+                var pu = (i.precoUnitario !== undefined && i.precoUnitario !== null) ? i.precoUnitario : (i.precoBase || 0);
+                var qtd = i.quantidade || 1;
+                return (i.nome || '') + (i.quantidade ? ' (' + i.quantidade + 'x)' : '');
               })
             : String(p.itens || '').split(' | ').filter(Boolean);
-          var itensHtml = itensLista.map(function (linha) {
-            return '<li>' + esc(linha) + '</li>';
-          }).join('');
 
-          /* só os status válidos para o tipo deste pedido */
-          var opcoesStatus = statusDoPedido(p.tipo).map(function (s) {
-            return '<option value="' + esc(s) + '"' + (p.status === s ? ' selected' : '') + '>' + esc(s) + '</option>';
-          }).join('');
+          var resumoItens = itensBrutos.slice(0, 3).map(function(x){ return esc(x); }).join('<br>');
+          if (itensBrutos.length > 3) resumoItens += '<br><small>+' + (itensBrutos.length - 3) + ' item(s)</small>';
 
-          return '' +
-          '<div class="pedido-card" data-pedido="' + esc(p.pedido) + '">' +
-            '<div class="pedido-info">' +
-              '<div class="pedido-numero">Pedido #' + esc(p.pedido) + '</div>' +
-              '<div class="pedido-detalhes">' +
-                '<div><strong>Data</strong>' + esc(dataCurta(p.data)) + '</div>' +
-                '<div><strong>Hora</strong>' + esc(horaCurta(p.hora)) + '</div>' +
-                '<div><strong>Cliente</strong>' + esc(p.cliente) + '</div>' +
-                '<div><strong>Tipo</strong>' + esc(p.tipo) + '</div>' +
-                '<div><strong>Pagamento</strong>' + esc(p.pagamento) + '</div>' +
-                '<div><strong>Total</strong>' + moeda(p.total) + '</div>' +
-              '</div>' +
-              (p.endereco ? '<div class="pedido-detalhes"><div><strong>Endereço</strong>' + esc(p.endereco) + '</div></div>' : '') +
-              (p.bairro ? '<div class="pedido-detalhes"><div><strong>Bairro</strong>' + esc(p.bairro) + '</div></div>' : '') +
-              (itensHtml ? '<div class="pedido-itens"><ul>' + itensHtml + '</ul></div>' : '') +
-              (p.observacoes ? '<div class="pedido-detalhes"><div><strong>Observações</strong>' + esc(p.observacoes) + '</div></div>' : '') +
+          var statusAtual = String(p.status || 'Pendente');
+          var proximo = '';
+          var btnAvancar = '';
+          if (statusAtual === 'Novo' || statusAtual === 'Pendente' || statusAtual === 'Aguardando' || statusAtual === 'Cancelado') {
+            proximo = 'Em Preparo';
+            btnAvancar = '<button type="button" class="btn btn-primario btn-xs btn-avancar" data-pedido="' + esc(p.pedido) + '" data-proximo="Em Preparo">Avançar para Em Preparo</button>';
+          } else if (statusAtual === 'Preparando' || statusAtual === 'Em Preparo') {
+            proximo = 'Pronto';
+            btnAvancar = '<button type="button" class="btn btn-primario btn-xs btn-avancar" data-pedido="' + esc(p.pedido) + '" data-proximo="Pronto">Avançar para Pronto</button>';
+          } else if (statusAtual === 'Preparado' || statusAtual === 'Pronto' || statusAtual === 'Saiu para entrega' || statusAtual === 'Saiu p/ entrega' || statusAtual === 'Saiu p/ Entrega') {
+            proximo = 'Entregue';
+            btnAvancar = '<button type="button" class="btn btn-sucesso btn-xs btn-avancar" data-pedido="' + esc(p.pedido) + '" data-proximo="Entregue">Avançar para Entregue</button>';
+          } else if (statusAtual === 'Concluído' || statusAtual === 'Entregue') {
+            btnAvancar = '';
+          }
+
+          var detalhesHtml = '<div class="pedido-detalhes-exp" data-detalhes="' + esc(p.pedido) + '">';
+
+          var blocoInfo = '<div class="detalhe-bloco"><div class="detalhe-linha"><span>Cliente</span><strong>' + esc(p.cliente || '-') + '</strong></div>' +
+            '<div class="detalhe-linha"><span>Tipo</span><strong>' + esc(p.tipo || '-') + '</strong></div>' +
+            '<div class="detalhe-linha"><span>Pagamento</span><strong>' + esc(p.pagamento || '-') + '</strong></div>' +
+            '<div class="detalhe-linha"><span>Data/Hora</span><strong>' + esc(dataCurta(p.data)) + ' ' + esc(horaCurta(p.hora)) + '</strong></div>' +
+            '<div class="detalhe-linha"><span>Subtotal</span><strong>' + moeda(p.subtotal || p.total || 0) + '</strong></div>' +
+            (p.taxa ? '<div class="detalhe-linha"><span>Taxa Entrega</span><strong>' + moeda(p.taxa) + '</strong></div>' : '') +
+            '<div class="detalhe-linha"><span>Total</span><strong>' + moeda(p.total || 0) + '</strong></div>' +
+            '</div>';
+
+          detalhesHtml += blocoInfo;
+
+          if (p.endereco || p.bairro) {
+            detalhesHtml += '<div class="detalhe-bloco">' +
+              (p.endereco ? '<div class="detalhe-linha"><span>Endereço</span><strong>' + esc(p.endereco) + '</strong></div>' : '') +
+              (p.bairro ? '<div class="detalhe-linha"><span>Bairro</span><strong>' + esc(p.bairro) + '</strong></div>' : '') +
+              '</div>';
+          }
+
+          if (p.observacoes) {
+            detalhesHtml += '<div class="detalhe-bloco"><strong>Observações</strong><div>' + esc(p.observacoes) + '</div></div>';
+          }
+
+          var itensCompletos = Array.isArray(p.itensObj) ? p.itensObj : null;
+          if (!itensCompletos && Array.isArray(p.itens)) itensCompletos = p.itens;
+
+          if (itensCompletos && itensCompletos.length) {
+            var persHtml = itensCompletos.map(function (it) {
+              var temPers = (it.removidos && it.removidos.length) || (it.extras && it.extras.length) || (it.observacao && it.observacao.trim());
+              if (!temPers) return '';
+              var bloco = '<div class="personalizacao-item"><div class="personalizacao-titulo">' + esc(it.nome || '') + (it.quantidade ? ' (' + it.quantidade + 'x)' : '') + '</div>';
+              if (it.removidos && it.removidos.length) bloco += '<div>Removidos: ' + it.removidos.map(esc).join(', ') + '</div>';
+              if (it.extras && it.extras.length) {
+                var extrasStr = it.extras.map(function(ex){ return esc(ex.nome) + (ex.preco ? ' (R$ ' + Number(ex.preco).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}) + ')' : ''); }).join(', ');
+                bloco += '<div>Adicionais: ' + extrasStr + '</div>';
+              }
+              if (it.observacao && it.observacao.trim()) bloco += '<div>Observações: ' + esc(it.observacao) + '</div>';
+              bloco += '</div>';
+              return bloco;
+            }).join('');
+            if (persHtml) detalhesHtml += '<div class="detalhe-bloco"><strong>Personalização</strong><div class="personalizacao-bloco">' + persHtml + '</div></div>';
+          } else if (Array.isArray(p.itens) && p.itens.length && typeof p.itens[0] === 'object') {
+          }
+
+          detalhesHtml += '</div>';
+
+          return '<div class="kanban-pedido" data-pedido-card="' + esc(p.pedido) + '">' +
+            '<div class="kanban-pedido-cabecalho">' +
+              '<div><div class="kanban-pedido-numero">Pedido #' + esc(p.pedido) + '</div><div class="kanban-pedido-hora">' + esc(dataCurta(p.data)) + ' • ' + esc(horaCurta(p.hora)) + '</div></div>' +
+              '<div class="kanban-pedido-hora">' + moeda(p.total || 0) + '</div>' +
             '</div>' +
-            '<div class="pedido-acoes">' +
-              '<span class="status-badge ' + classeStatus(p.status) + '">' + esc(p.status) + '</span>' +
-              '<select class="status-select" data-status-pedido="' + esc(p.pedido) + '">' +
-                '<option value="">Alterar status...</option>' +
-                opcoesStatus +
-              '</select>' +
+            '<div class="kanban-linha"><strong>Cliente:</strong> ' + esc(p.cliente || '-') + '</div>' +
+            '<div class="kanban-linha"><strong>Tipo:</strong> ' + esc(p.tipo || '-') + ' • <strong>Pagto:</strong> ' + esc(p.pagamento || '-') + '</div>' +
+            (resumoItens ? '<div class="kanban-itens-resumo">' + resumoItens + '</div>' : '') +
+            '<div class="kanban-acoes">' +
+              btnAvancar +
+              '<button type="button" class="btn btn-contorno btn-xs btn-detalhes" data-toggle="' + esc(p.pedido) + '">Ver detalhes</button>' +
             '</div>' +
+            detalhesHtml +
           '</div>';
-        }).join(''));
+        }
+
+        el.kanbanContainer.innerHTML =
+          '<div class="kanban">' +
+            '<div class="kanban-coluna"><div class="kanban-cabecalho">Pendentes <span class="kanban-contagem">' + (colunas['Pendente'].length) + '</span></div><div class="kanban-pedidos">' + (colunas['Pendente'].map(cardPedido).join('') || '<div class="pedido-vazio-icone" style="text-align:center;margin:20px 0">📋</div><p style="text-align:center;color:var(--texto-suave);font-size:.85rem">Nenhum</p>') + '</div></div>' +
+            '<div class="kanban-coluna"><div class="kanban-cabecalho">Em Preparo <span class="kanban-contagem">' + (colunas['Em Preparo'].length) + '</span></div><div class="kanban-pedidos">' + (colunas['Em Preparo'].map(cardPedido).join('') || '<div style="text-align:center;color:var(--texto-suave);font-size:.85rem;padding:20px 0">Nenhum</div>') + '</div></div>' +
+            '<div class="kanban-coluna"><div class="kanban-cabecalho">Prontos <span class="kanban-contagem">' + (colunas['Pronto'].length) + '</span></div><div class="kanban-pedidos">' + (colunas['Pronto'].map(cardPedido).join('') || '<div style="text-align:center;color:var(--texto-suave);font-size:.85rem;padding:20px 0">Nenhum</div>') + '</div></div>' +
+            '<div class="kanban-coluna"><div class="kanban-cabecalho">Entregues <span class="kanban-contagem">' + (colunas['Entregue'].length) + '</span></div><div class="kanban-pedidos">' + (colunas['Entregue'].map(cardPedido).join('') || '<div style="text-align:center;color:var(--texto-suave);font-size:.85rem;padding:20px 0">Nenhum</div>') + '</div></div>' +
+          '</div>';
       }
 
       function alterarStatus(pedido, novoStatus) {
@@ -516,12 +659,27 @@
 
         el.btnAtualizar.addEventListener('click', function () { buscarPedidos(); });
 
-        el.pedidosLista.addEventListener('change', function (ev) {
-          var select = ev.target.closest('[data-status-pedido]');
-          if (!select) return;
-          var pedido = select.getAttribute('data-status-pedido');
-          var novoStatus = select.value;
-          if (novoStatus) alterarStatus(pedido, novoStatus);
+        el.kanbanContainer.addEventListener('click', function (ev) {
+          var btnAv = ev.target.closest('.btn-avancar');
+          if (btnAv) {
+            var pedido = btnAv.getAttribute('data-pedido');
+            var prox = btnAv.getAttribute('data-proximo');
+            if (prox === 'Entregue') {
+              if (!confirm('Tem certeza que deseja marcar este pedido como ENTREGUE?')) return;
+            }
+            if (pedido && prox) alterarStatus(pedido, prox);
+            return;
+          }
+          var btnDet = ev.target.closest('.btn-detalhes');
+          if (btnDet) {
+            var pid = btnDet.getAttribute('data-toggle');
+            var det = document.querySelector('[data-detalhes="' + pid + '"]');
+            if (det) {
+              det.classList.toggle('aberto');
+              btnDet.textContent = det.classList.contains('aberto') ? 'Ocultar detalhes' : 'Ver detalhes';
+            }
+            return;
+          }
         });
       }
 
@@ -531,7 +689,7 @@
           filtroStatus: $('#filtroStatus'),
           btnLimparFiltros: $('#btnLimparFiltros'),
           btnAtualizar: $('#btnAtualizar'),
-          pedidosLista: $('#pedidosLista'),
+          kanbanContainer: $('#kanbanContainer'),
           atualizadoEm: $('#atualizadoEm'),
           toasts: $('#toasts')
         };
