@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Player Smart TV - Mídia Indoor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --ticker-duration: 30s;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #0b0f17;
+            color: #f3f4f6;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Continuous Ticker Animation */
+        @keyframes tickerAnimation {
+            0% { transform: translateX(100%); }
+            100% { transform: translateX(-100%); }
+        }
+
+        .ticker-text {
+            display: inline-block;
+            white-space: nowrap;
+            padding-left: 100%;
+            animation: tickerAnimation var(--ticker-duration) linear infinite;
+        }
+
+        .ticker-text:hover {
+            animation-play-state: paused;
+        }
+
+        /* Glassmorphism styling */
+        .glass-panel {
+            background: rgba(17, 24, 39, 0.75);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Custom Scrollbar for Modal */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+
+        /* Progress Bar Animation */
+        .progress-bar-fill {
+            transition: width 0.1s linear;
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between bg-slate-950 text-white relative font-sans">
+
+    <!-- Top Floating Admin Gear Button -->
+    <button id="btn-open-settings" title="Painel de Configurações" 
+        class="fixed top-4 right-4 z-40 bg-slate-800/80 hover:bg-blue-600 text-white p-3 rounded-full transition-all duration-300 shadow-lg border border-slate-700/50 focus:outline-none hover:scale-105 active:scale-95 group">
+        <i class="fas fa-cog text-xl group-hover:rotate-90 transition-transform duration-500"></i>
+    </button>
+
+    <!-- MAIN PLAYER SCREEN CONTAINER -->
+    <div id="player-container" class="flex-1 flex flex-col h-full w-full overflow-hidden">
+        
+        <!-- TOP/CENTER BODY (SPLIT OR FULL SCREEN) -->
+        <div id="layout-body" class="flex-1 flex flex-row overflow-hidden relative">
+            
+            <!-- MAIN MEDIA DISPLAY AREA (70% or 100%) -->
+            <div id="media-container" class="relative flex-1 bg-black flex items-center justify-center overflow-hidden transition-all duration-500">
+                <!-- Media Elements (Images / Video) -->
+                <img id="media-image" class="w-full h-full object-cover hidden" alt="Mídia de Imagem" src="" onerror="this.src='https://placehold.co/1280x720/1e293b/ffffff?text=Erro+ao+carregar+imagem'" />
+                <video id="media-video" class="w-full h-full object-cover hidden" autoplay muted playsinline></video>
+
+                <!-- Media Overlay Information Banner -->
+                <div id="media-overlay" class="absolute bottom-4 left-4 bg-slate-900/85 backdrop-blur-md px-4 py-2 rounded-xl border border-slate-700/50 max-w-lg hidden">
+                    <span id="media-title" class="font-bold text-lg text-white block">Título da Mídia</span>
+                    <span id="media-desc" class="text-xs text-slate-300 block">Descrição complementar informativa.</span>
+                </div>
+
+                <!-- Timer Progress Bar -->
+                <div class="absolute bottom-0 left-0 right-0 h-1.5 bg-slate-800/60">
+                    <div id="timer-progress" class="h-full bg-blue-500 progress-bar-fill w-0"></div>
+                </div>
+            </div>
+
+            <!-- SIDE PANEL (30%) -->
+            <div id="side-panel" class="w-80 lg:w-96 glass-panel border-l border-slate-800 flex flex-col justify-between p-6 z-10 transition-all duration-500">
+                <!-- Top: Logo & Branding -->
+                <div class="flex flex-col items-center border-b border-slate-800 pb-6">
+                    <img id="side-logo" src="https://placehold.co/200x70/2563eb/ffffff?text=SUA+MARCA" alt="Logo Corporativa" class="max-h-20 object-contain mb-2 rounded-lg" onerror="this.src='https://placehold.co/200x70/1e293b/ffffff?text=LOGOTIPO'" />
+                    <span class="text-xs uppercase tracking-widest text-slate-400 font-semibold mt-1">Canal Corporativo</span>
+                </div>
+
+                <!-- Center: Clock & Weather Widget -->
+                <div class="my-auto flex flex-col items-center justify-center text-center space-y-6">
+                    <!-- Digital Clock -->
+                    <div class="bg-slate-900/60 rounded-2xl p-4 w-full border border-slate-800 shadow-inner">
+                        <div id="clock-time" class="text-4xl lg:text-5xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-white font-mono">
+                            00:00:00
+                        </div>
+                        <div id="clock-date" class="text-xs lg:text-sm text-slate-400 mt-1 capitalize font-medium">
+                            Segunda-feira, 1 de Janeiro
+                        </div>
+                    </div>
+
+                    <!-- Weather Widget -->
+                    <div id="weather-widget" class="bg-gradient-to-br from-slate-900/80 to-slate-800/80 rounded-2xl p-4 w-full border border-slate-700/40 flex items-center justify-between shadow-lg">
+                        <div class="flex items-center space-x-3">
+                            <i id="weather-icon" class="fas fa-sun text-yellow-400 text-3xl"></i>
+                            <div class="text-left">
+                                <span id="weather-temp" class="text-2xl font-bold text-white block">28°C</span>
+                                <span id="weather-city" class="text-xs text-slate-400 block">São Paulo, BR</span>
+                            </div>
+                        </div>
+                        <span id="weather-desc" class="text-xs bg-slate-800 px-2.5 py-1 rounded-full text-slate-300 font-medium border border-slate-700">
+                            Ensolarado
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Bottom: Info Card -->
+                <div class="bg-blue-950/40 border border-blue-800/40 rounded-xl p-4 text-xs text-slate-300 space-y-2">
+                    <div class="flex items-center text-blue-400 font-semibold space-x-1.5">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Aviso Institucional</span>
+                    </div>
+                    <p class="leading-relaxed text-slate-300">
+                        Mantenha-se informado sobre nossas metas e avisos de segurança no trabalho. Dúvidas no RH.
+                    </p>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- BOTTOM NEWS TICKER (Rss Marquee) -->
+        <div id="ticker-bar" class="h-12 bg-gradient-to-r from-blue-900 via-slate-900 to-blue-950 border-t border-slate-800 flex items-center overflow-hidden relative shadow-2xl z-20">
+            <!-- Ticker Badge -->
+            <div class="bg-blue-600 text-white font-extrabold text-xs tracking-wider px-4 h-full flex items-center z-20 shadow-md uppercase shrink-0 space-x-2">
+                <i class="fas fa-bullhorn animate-pulse"></i>
+                <span>Notícias</span>
+            </div>
+
+            <!-- Moving Text Container -->
+            <div class="flex-1 overflow-hidden relative flex items-center">
+                <div id="ticker-content" class="ticker-text font-medium text-slate-200 text-sm tracking-wide">
+                    Carregando feed de notícias e comunicados atualizados...
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- PIN AUTH MODAL -->
+    <div id="modal-pin" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-sm text-center shadow-2xl space-y-5">
+            <div class="w-14 h-14 bg-blue-600/20 text-blue-500 rounded-full flex items-center justify-center mx-auto border border-blue-500/30">
+                <i class="fas fa-lock text-2xl"></i>
+            </div>
+            <div>
+                <h3 class="text-xl font-bold text-white">Acesso Restrito</h3>
+                <p class="text-xs text-slate-400 mt-1">Digite o PIN do Administrador para acessar as configurações.</p>
+            </div>
+            
+            <input type="password" id="input-pin" maxlength="6" placeholder="••••"
+                class="w-full text-center text-2xl tracking-widest bg-slate-950 border border-slate-700 rounded-xl py-3 text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all font-mono" />
+
+            <div id="pin-error" class="text-xs text-red-400 hidden font-semibold">
+                PIN incorreto! Tente novamente.
+            </div>
+
+            <div class="flex space-x-3">
+                <button id="btn-cancel-pin" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold py-2.5 rounded-xl transition text-sm">
+                    Cancelar
+                </button>
+                <button id="btn-submit-pin" class="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-xl transition text-sm shadow-lg shadow-blue-600/30">
+                    Acessar
+                </button>
+            </div>
+            <p class="text-[10px] text-slate-500">PIN Padrão: <span class="font-mono text-slate-400">1234</span></p>
+        </div>
+    </div>
+
+    <!-- ADMIN SETTINGS MODAL -->
+    <div id="modal-settings" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            
+            <!-- Modal Header -->
+            <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-slate-950">
+                <div class="flex items-center space-x-3">
+                    <i class="fas fa-sliders-h text-blue-500 text-xl"></i>
+                    <h2 class="text-lg font-bold text-white">Configurações do Player Indoor</h2>
+                </div>
+                <button id="btn-close-settings" class="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition">
+                    <i class="fas fa-times text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Modal Content Form -->
+            <div class="p-6 overflow-y-auto space-y-6 text-sm text-slate-300 flex-1">
+                
+                <!-- Layout Options -->
+                <div class="space-y-3">
+                    <label class="font-semibold text-white flex items-center space-x-2">
+                        <i class="fas fa-desktop text-blue-400"></i>
+                        <span>Modo de Exibição da Tela</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <label class="flex items-center space-x-3 p-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:border-slate-700">
+                            <input type="radio" name="cfg-layout" value="split" class="text-blue-600 focus:ring-0">
+                            <div>
+                                <span class="text-white font-medium block">Dividido (70/30)</span>
+                                <span class="text-xs text-slate-500">Mídia + Painel de Relógio</span>
+                            </div>
+                        </label>
+                        <label class="flex items-center space-x-3 p-3 bg-slate-950 border border-slate-800 rounded-xl cursor-pointer hover:border-slate-700">
+                            <input type="radio" name="cfg-layout" value="full" class="text-blue-600 focus:ring-0">
+                            <div>
+                                <span class="text-white font-medium block">Tela Cheia (100%)</span>
+                                <span class="text-xs text-slate-500">Apenas mídia expansiva</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Ticker Speed Setting (NOVA FUNCIONALIDADE) -->
+                <div class="space-y-2">
+                    <label for="cfg-ticker-speed" class="font-semibold text-white flex items-center space-x-2">
+                        <i class="fas fa-tachometer-alt text-yellow-400"></i>
+                        <span>Velocidade do Ticker de Notícias (Rodapé)</span>
+                    </label>
+                    <select id="cfg-ticker-speed" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500">
+                        <option value="60s">Muito Lenta (60 segundos)</option>
+                        <option value="45s">Lenta (45 segundos)</option>
+                        <option value="30s">Normal (30 segundos - Padrão)</option>
+                        <option value="20s">Rápida (20 segundos)</option>
+                        <option value="12s">Muito Rápida (12 segundos)</option>
+                    </select>
+                </div>
+
+                <!-- URLs Input -->
+                <div class="space-y-4 pt-2 border-t border-slate-800">
+                    <div>
+                        <label for="cfg-playlist-url" class="block font-semibold text-white mb-1">URL do JSON da Playlist</label>
+                        <input type="url" id="cfg-playlist-url" placeholder="https://exemplo.com/playlist.json" 
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 text-xs font-mono" />
+                        <span class="text-[11px] text-slate-500">Deixe em branco para utilizar a playlist local de demonstração.</span>
+                    </div>
+
+                    <div>
+                        <label for="cfg-logo-url" class="block font-semibold text-white mb-1">URL da Logotipo</label>
+                        <input type="url" id="cfg-logo-url" placeholder="https://exemplo.com/logo.png" 
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 text-xs font-mono" />
+                    </div>
+
+                    <div>
+                        <label for="cfg-weather-city" class="block font-semibold text-white mb-1">Cidade (Previsão do Tempo)</label>
+                        <input type="text" id="cfg-weather-city" placeholder="Ex: São Paulo, BR" 
+                            class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 text-xs" />
+                    </div>
+                </div>
+
+                <!-- Change Security PIN -->
+                <div class="pt-2 border-t border-slate-800 space-y-2">
+                    <label for="cfg-new-pin" class="block font-semibold text-white">Alterar PIN de Acesso</label>
+                    <input type="password" id="cfg-new-pin" placeholder="Novo PIN (ex: 1234)" maxlength="6"
+                        class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white focus:outline-none focus:border-blue-500 text-xs tracking-widest font-mono" />
+                </div>
+
+                <!-- Advanced Actions & Proof of Play -->
+                <div class="pt-4 border-t border-slate-800 flex flex-wrap gap-3">
+                    <button id="btn-force-refresh" class="bg-blue-600/20 border border-blue-500/40 text-blue-400 hover:bg-blue-600 hover:text-white px-4 py-2.5 rounded-xl font-medium transition text-xs flex items-center space-x-2">
+                        <i class="fas fa-sync-alt"></i>
+                        <span>Forçar Atualização Instantânea</span>
+                    </button>
+                    
+                    <button id="btn-export-pop" class="bg-emerald-600/20 border border-emerald-500/40 text-emerald-400 hover:bg-emerald-600 hover:text-white px-4 py-2.5 rounded-xl font-medium transition text-xs flex items-center space-x-2">
+                        <i class="fas fa-file-download"></i>
+                        <span>Exportar Log Proof-of-Play (JSON)</span>
+                    </button>
+
+                    <button id="btn-factory-reset" class="bg-red-600/20 border border-red-500/40 text-red-400 hover:bg-red-600 hover:text-white px-4 py-2.5 rounded-xl font-medium transition text-xs flex items-center space-x-2 ml-auto">
+                        <i class="fas fa-trash-alt"></i>
+                        <span>Reset de Fábrica</span>
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="p-4 border-t border-slate-800 bg-slate-950 flex justify-between items-center">
+                <span class="text-xs text-slate-500">Player Indoor v2.4 - Status: <span class="text-emerald-400 font-semibold">Operacional</span></span>
+                <button id="btn-save-settings" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-6 py-2.5 rounded-xl transition text-sm shadow-lg shadow-blue-600/30">
+                    Salvar e Aplicar
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Toast Notification Banner -->
+    <div id="toast-notification" class="fixed bottom-16 right-6 z-50 bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+        <i id="toast-icon" class="fas fa-check-circle text-lg"></i>
+        <span id="toast-message" class="text-sm font-semibold">Ação realizada com sucesso!</span>
+    </div>
+
+    <script>
+        /* MAIN APPLICATION CONTROLLER AND STATE STORAGE */
+
+        // Default Embedded Fallback Demo Playlist
+        const DEMO_PLAYLIST = [
+            {
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1280&q=80',
+                duration: 8,
+                title: 'Bem-vindo à Matriz Corporativa',
+                description: 'Inovação e excelência em serviços para impulsionar seus negócios.'
+            },
+            {
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1280&q=80',
+                duration: 10,
+                title: 'Reunião Geral do Time de Vendas',
+                description: 'Nesta sexta-feira às 15h no auditório principal. Presença confirmada.'
+            },
+            {
+                type: 'video',
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                duration: 12,
+                title: 'Vídeo Institucional de Treinamento',
+                description: 'Confira as atualizações de segurança e processos da semana.'
+            },
+            {
+                type: 'image',
+                url: 'https://images.unsplash.com/photo-1542744094-3a31b272c490?auto=format&fit=crop&w=1280&q=80',
+                duration: 7,
+                title: 'Metas Trimestrais Atingidas!',
+                description: 'Parabéns a toda a equipe de operações pelos resultados alcançados.'
+            }
+        ];
+
+        // DEMO RSS TICKER NEWS
+        const DEMO_TICKER_TEXT = "🚀 Destaque: Resultados do 3º Trimestre superam expectativas em 15% • 📢 Aviso: Manutenção programada do sistema de TI no sábado das 22h às 02h • 🏆 Colaborador do mês: Mariana Silva (RH) - Parabéns pelo engajamento! • 🌧️ Previsão de chuva forte para o fim da tarde, previna-se • ☕ Novo café especial disponível no lounge do 3º andar.";
+
+        // APPLICATION STATE VARIABLES
+        let appState = {
+            pin: '1234',
+            layout: 'split',
+            tickerSpeed: '30s',
+            playlistUrl: '',
+            logoUrl: '',
+            weatherCity: 'São Paulo, BR',
+            currentPlaylist: DEMO_PLAYLIST,
+            currentIndex: 0,
+            timerId: null,
+            progressInterval: null,
+            proofOfPlayLog: []
+        };
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadStoredSettings();
+            initClock();
+            initWeather();
+            setupEventListeners();
+            startPlaylist();
+        });
+
+        // 1. STORAGE & SETTINGS MANAGEMENT
+        function loadStoredSettings() {
+            const savedPin = localStorage.getItem('player_pin');
+            const savedLayout = localStorage.getItem('player_layout');
+            const savedSpeed = localStorage.getItem('player_ticker_speed');
+            const savedPlaylistUrl = localStorage.getItem('player_playlist_url');
+            const savedLogoUrl = localStorage.getItem('player_logo_url');
+            const savedCity = localStorage.getItem('player_city');
+
+            if (savedPin) appState.pin = savedPin;
+            if (savedLayout) appState.layout = savedLayout;
+            if (savedSpeed) appState.tickerSpeed = savedSpeed;
+            if (savedPlaylistUrl) appState.playlistUrl = savedPlaylistUrl;
+            if (savedLogoUrl) appState.logoUrl = savedLogoUrl;
+            if (savedCity) appState.weatherCity = savedCity;
+
+            applySettingsToUI();
+        }
+
+        function applySettingsToUI() {
+            // Apply Layout Mode
+            const sidePanel = document.getElementById('side-panel');
+            if (appState.layout === 'full') {
+                sidePanel.classList.add('hidden');
+            } else {
+                sidePanel.classList.remove('hidden');
+            }
+
+            // Apply Ticker Speed dynamically
+            applyTickerSpeed(appState.tickerSpeed);
+
+            // Apply Custom Logo
+            const logoImg = document.getElementById('side-logo');
+            if (appState.logoUrl && appState.logoUrl.trim() !== '') {
+                logoImg.src = appState.logoUrl;
+            } else {
+                logoImg.src = 'https://placehold.co/200x70/2563eb/ffffff?text=SUA+MARCA';
+            }
+
+            // Apply RSS Ticker text
+            document.getElementById('ticker-content').innerText = DEMO_TICKER_TEXT;
+        }
+
+        function applyTickerSpeed(speed) {
+            appState.tickerSpeed = speed;
+            document.documentElement.style.setProperty('--ticker-duration', speed);
+        }
+
+        // 2. CLOCK & WEATHER CONTROLLER
+        function initClock() {
+            const updateClock = () => {
+                const now = new Date();
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                document.getElementById('clock-time').innerText = `${hours}:${minutes}:${seconds}`;
+
+                const options = { weekday: 'long', day: 'numeric', month: 'long' };
+                document.getElementById('clock-date').innerText = now.toLocaleDateString('pt-BR', options);
+            };
+
+            updateClock();
+            setInterval(updateClock, 1000);
+        }
+
+        function initWeather() {
+            // Simulated Weather Update
+            document.getElementById('weather-city').innerText = appState.weatherCity;
+        }
+
+        // 3. PLAYLIST ENGINE & MEDIA ROTATOR
+        function startPlaylist() {
+            if (appState.timerId) clearTimeout(appState.timerId);
+            if (appState.progressInterval) clearInterval(appState.progressInterval);
+
+            if (!appState.currentPlaylist || appState.currentPlaylist.length === 0) {
+                appState.currentPlaylist = DEMO_PLAYLIST;
+            }
+
+            renderCurrentSlide();
+        }
+
+        function renderCurrentSlide() {
+            const media = appState.currentPlaylist[appState.currentIndex];
+            const imgEl = document.getElementById('media-image');
+            const videoEl = document.getElementById('media-video');
+            const overlay = document.getElementById('media-overlay');
+            const titleEl = document.getElementById('media-title');
+            const descEl = document.getElementById('media-desc');
+            const progressBar = document.getElementById('timer-progress');
+
+            // Reset Elements
+            imgEl.classList.add('hidden');
+            videoEl.classList.add('hidden');
+            videoEl.pause();
+            progressBar.style.width = '0%';
+
+            // Set Title/Desc Overlay
+            if (media.title || media.description) {
+                titleEl.innerText = media.title || '';
+                descEl.innerText = media.description || '';
+                overlay.classList.remove('hidden');
+            } else {
+                overlay.classList.add('hidden');
+            }
+
+            // Log Proof of Play
+            logProofOfPlay(media);
+
+            const durationSec = media.duration || 10;
+
+            if (media.type === 'video') {
+                videoEl.src = media.url;
+                videoEl.classList.remove('hidden');
+                videoEl.currentTime = 0;
+                videoEl.play().catch(e => console.warn('Autoplay video notice:', e));
+            } else {
+                imgEl.src = media.url;
+                imgEl.classList.remove('hidden');
+            }
+
+            // Animate progress bar
+            let startTime = Date.now();
+            if (appState.progressInterval) clearInterval(appState.progressInterval);
+            
+            appState.progressInterval = setInterval(() => {
+                let elapsed = (Date.now() - startTime) / 1000;
+                let pct = Math.min((elapsed / durationSec) * 100, 100);
+                progressBar.style.width = `${pct}%`;
+                if (pct >= 100) clearInterval(appState.progressInterval);
+            }, 100);
+
+            // Timer for Next Slide
+            appState.timerId = setTimeout(() => {
+                appState.currentIndex = (appState.currentIndex + 1) % appState.currentPlaylist.length;
+                renderCurrentSlide();
+            }, durationSec * 1000);
+        }
+
+        function logProofOfPlay(media) {
+            const entry = {
+                timestamp: new Date().toISOString(),
+                mediaTitle: media.title || 'Sem título',
+                mediaUrl: media.url,
+                type: media.type
+            };
+            appState.proofOfPlayLog.push(entry);
+            // Keep max 100 logs
+            if (appState.proofOfPlayLog.length > 100) appState.proofOfPlayLog.shift();
+        }
+
+        // 4. EVENT LISTENERS AND MODAL HANDLERS
+        function setupEventListeners() {
+            const btnOpenSettings = document.getElementById('btn-open-settings');
+            const modalPin = document.getElementById('modal-pin');
+            const modalSettings = document.getElementById('modal-settings');
+            const btnSubmitPin = document.getElementById('btn-submit-pin');
+            const btnCancelPin = document.getElementById('btn-cancel-pin');
+            const inputPin = document.getElementById('input-pin');
+            const btnCloseSettings = document.getElementById('btn-close-settings');
+            const btnSaveSettings = document.getElementById('btn-save-settings');
+            const btnForceRefresh = document.getElementById('btn-force-refresh');
+            const btnExportPop = document.getElementById('btn-export-pop');
+            const btnFactoryReset = document.getElementById('btn-factory-reset');
+
+            // Open PIN Dialog
+            btnOpenSettings.addEventListener('click', () => {
+                inputPin.value = '';
+                document.getElementById('pin-error').classList.add('hidden');
+                modalPin.classList.remove('hidden');
+                inputPin.focus();
+            });
+
+            // Cancel PIN Dialog
+            btnCancelPin.addEventListener('click', () => {
+                modalPin.classList.add('hidden');
+            });
+
+            // Submit PIN Verification
+            btnSubmitPin.addEventListener('click', verifyPin);
+            inputPin.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') verifyPin();
+            });
+
+            function verifyPin() {
+                if (inputPin.value === appState.pin) {
+                    modalPin.classList.add('hidden');
+                    populateSettingsForm();
+                    modalSettings.classList.remove('hidden');
+                } else {
+                    document.getElementById('pin-error').classList.remove('hidden');
+                    inputPin.value = '';
+                }
+            }
+
+            // Close Settings Panel
+            btnCloseSettings.addEventListener('click', () => {
+                modalSettings.classList.add('hidden');
+            });
+
+            // Save Settings Form
+            btnSaveSettings.addEventListener('click', () => {
+                const selectedLayout = document.querySelector('input[name="cfg-layout"]:checked')?.value || 'split';
+                const selectedSpeed = document.getElementById('cfg-ticker-speed').value;
+                const playlistUrl = document.getElementById('cfg-playlist-url').value;
+                const logoUrl = document.getElementById('cfg-logo-url').value;
+                const city = document.getElementById('cfg-weather-city').value;
+                const newPin = document.getElementById('cfg-new-pin').value;
+
+                appState.layout = selectedLayout;
+                appState.tickerSpeed = selectedSpeed;
+                appState.playlistUrl = playlistUrl;
+                appState.logoUrl = logoUrl;
+                if (city.trim()) appState.weatherCity = city;
+                if (newPin.trim()) appState.pin = newPin;
+
+                // Save to LocalStorage
+                localStorage.setItem('player_layout', appState.layout);
+                localStorage.setItem('player_ticker_speed', appState.tickerSpeed);
+                localStorage.setItem('player_playlist_url', appState.playlistUrl);
+                localStorage.setItem('player_logo_url', appState.logoUrl);
+                localStorage.setItem('player_city', appState.weatherCity);
+                localStorage.setItem('player_pin', appState.pin);
+
+                applySettingsToUI();
+                modalSettings.classList.add('hidden');
+                showToast('Configurações salvas e aplicadas!');
+            });
+
+            // Force Refresh
+            btnForceRefresh.addEventListener('click', () => {
+                appState.currentIndex = 0;
+                startPlaylist();
+                modalSettings.classList.add('hidden');
+                showToast('Playlist recarregada com sucesso!');
+            });
+
+            // Export Proof of Play
+            btnExportPop.addEventListener('click', () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(appState.proofOfPlayLog, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `proof_of_play_${new Date().toISOString().slice(0,10)}.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                showToast('Log Proof-of-Play exportado!');
+            });
+
+            // Factory Reset
+            btnFactoryReset.addEventListener('click', () => {
+                if (confirm('Tem certeza que deseja restaurar as configurações originais de fábrica?')) {
+                    localStorage.clear();
+                    appState.pin = '1234';
+                    appState.layout = 'split';
+                    appState.tickerSpeed = '30s';
+                    appState.playlistUrl = '';
+                    appState.logoUrl = '';
+                    appState.weatherCity = 'São Paulo, BR';
+                    appState.currentPlaylist = DEMO_PLAYLIST;
+                    appState.currentIndex = 0;
+
+                    applySettingsToUI();
+                    startPlaylist();
+                    modalSettings.classList.add('hidden');
+                    showToast('Configurações restauradas com sucesso!');
+                }
+            });
+        }
+
+        function populateSettingsForm() {
+            document.querySelector(`input[name="cfg-layout"][value="${appState.layout}"]`).checked = true;
+            document.getElementById('cfg-ticker-speed').value = appState.tickerSpeed;
+            document.getElementById('cfg-playlist-url').value = appState.playlistUrl || '';
+            document.getElementById('cfg-logo-url').value = appState.logoUrl || '';
+            document.getElementById('cfg-weather-city').value = appState.weatherCity || '';
+            document.getElementById('cfg-new-pin').value = '';
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast-notification');
+            const msgEl = document.getElementById('toast-message');
+            msgEl.innerText = message;
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
