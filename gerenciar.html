@@ -533,6 +533,14 @@
       setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 2400);
     }
 
+    function contarPor(g){
+      var c=0;
+      for(var i=0;i<pedidos.length;i++){
+        if(normalizarStatus(pedidos[i].status)===g) c++;
+      }
+      return c;
+    }
+
     function renderKanban(){
       if(!el.kanban) return;
       var colunas = [
