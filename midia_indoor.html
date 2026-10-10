@@ -1,371 +1,304 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Player de Mídia Indoor Otimizado</title>
-    <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: #000; overflow: hidden; font-family: Arial, sans-serif; }
-        
-        /* Estrutura de Layout Geral */
-        #screenWrapper { display: flex; width: 100%; height: calc(100% - 60px); position: relative; }
-        
-        /* Área Principal do Player */
-        #playerContainer { width: 100%; height: 100%; position: relative; background: #000; transition: width 0.3s ease; }
-        
-        /* Menu Lateral Fixo (Layout Dividido 30%) */
-        #sideMenu { width: 0%; height: 100%; background: #1e293b; color: white; display: none; box-sizing: border-box; padding: 20px; border-left: 4px solid #dc2626; overflow: hidden; transition: width 0.3s ease; flex-direction: column; }
-        #sideMenu h2 { margin-top: 0; color: #ef4444; border-bottom: 2px solid #334155; padding-bottom: 10px; font-size: 24px; }
-        #sideContent { font-size: 18px; line-height: 1.6; white-space: pre-line; }
-
-        /* Classes de ativação do layout dividido */
-        body.split-layout #playerContainer { width: 70%; }
-        body.split-layout #sideMenu { width: 30%; display: flex; }
-
-        /* Elementos das mídias rotativas */
-        .media-node { position: absolute; width: 100%; height: 100%; top: 0; left: 0; opacity: 0; transition: opacity 0.8s ease-in-out; display: none; object-fit: contain; border: none; }
-        .media-node.active { opacity: 1; display: block; }
-
-        /* Logotipo Flutuante Customizável */
-        #brandLogo { position: absolute; max-width: 180px; max-height: 80px; z-index: 999; filter: drop-shadow(2px 4px 6px rgba(0,0,0,0.7)); display: none; }
-        .logo-top-right { top: 20px; right: 20px; }
-        .logo-top-left { top: 20px; left: 70px; }
-        .logo-bottom-right { bottom: 20px; right: 20px; }
-        .logo-bottom-left { bottom: 20px; left: 20px; }
-
-        /* Barra de Notícias e Widgets */
-        #bottomTicker { position: absolute; bottom: 0; left: 0; width: 100%; height: 60px; background: #111; border-top: 3px solid #dc2626; display: flex; align-items: center; z-index: 1000; color: white; }
-        #tickerNews { flex: 1; overflow: hidden; white-space: nowrap; font-size: 20px; font-weight: bold; background: #1a1a1a; height: 100%; display: flex; align-items: center; }
-        .marquee-text { display: inline-block; padding-left: 100%; animation: marquee 35s linear infinite; }
-        #tickerWidget { width: 320px; background: #dc2626; height: 100%; display: flex; align-items: center; justify-content: space-around; font-weight: bold; font-size: 18px; box-shadow: -4px 0 10px rgba(0,0,0,0.3); }
-
-        @keyframes marquee { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-100%, 0, 0); } }
-
-        /* Controle administrativo */
-        #configTrigger { position: absolute; top: 15px; left: 15px; z-index: 1001; background: rgba(0,0,0,0.5); border: none; color: white; font-size: 24px; padding: 10px; border-radius: 50%; cursor: pointer; transition: 0.3s; }
-        #configTrigger:hover { background: #dc2626; }
-        #adminPanel { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.95); z-index: 1002; display: flex; align-items: center; justify-content: center; color: white; overflow-y: auto; padding: 20px 0; }
-        .panel-content { background: #1e293b; padding: 25px; border-radius: 12px; width: 90%; max-width: 550px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); box-sizing: border-box; }
-        .panel-content h2 { margin-top: 0; color: #3b82f6; border-bottom: 1px solid #334155; padding-bottom: 10px; }
-        .input-box { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #475569; background: #0f172a; color: white; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
-        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-        .btn-action { background: #2563eb; color: white; border: none; padding: 12px 20px; font-weight: bold; border-radius: 6px; cursor: pointer; width: 100%; font-size: 16px; margin-top: 10px; }
-        .btn-action:hover { background: #1d4ed8; }
-        .btn-danger { background: #ef4444; margin-top: 15px; }
-        .btn-danger:hover { background: #dc2626; }
-
-        /* Toast Popup Notificação */
-        #updateToast { position: absolute; bottom: 80px; left: 20px; background: #16a34a; color: white; padding: 12px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.3); z-index: 1010; opacity: 0; transform: translateY(20px); transition: opacity 0.4s, transform 0.4s; display: none; }
-        #updateToast.show { display: block; opacity: 1; transform: translateY(0); }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mídia Indoor — Player</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:Arial,Helvetica,sans-serif;cursor:none}
+#app{position:absolute;top:0;left:0;right:0;bottom:0}
+#stage{position:absolute;top:0;left:0;bottom:6vh;width:100%;background:#000;overflow:hidden;transition:width .6s}
+#app.split #stage{width:70%}
+#stage img,#stage video,#stage iframe{position:absolute;top:0;left:0;width:100%;height:100%;border:0;object-fit:contain;background:#000}
+#side{position:absolute;top:0;right:0;bottom:6vh;width:30%;background:linear-gradient(160deg,#10243f,#081221);display:none;flex-direction:column;align-items:center;justify-content:space-around;padding:4vh 2vw;text-align:center}
+#app.split #side{display:flex}
+#side .logo{max-width:80%;max-height:18vh}
+#sClock{font-size:9vh;font-weight:700;letter-spacing:.02em}
+#sDate{font-size:2.6vh;opacity:.8;text-transform:capitalize;margin-top:1vh}
+#sWeather{font-size:2.8vh}#sWeather b{display:block;font-size:7vh}
+#overlay{position:absolute;top:2vh;right:2vw;display:flex;align-items:center;gap:1.5vw;background:rgba(0,0,0,.45);padding:1vh 1.4vw;border-radius:1.2vh;font-size:3vh;font-weight:700}
+#overlay img{max-height:5vh}
+#app.split #overlay{display:none}
+#ticker{position:absolute;left:0;right:0;bottom:0;height:6vh;background:#c8102e;display:flex;align-items:center;overflow:hidden}
+#tLabel{position:relative;z-index:2;background:#8b0a1e;height:100%;display:flex;align-items:center;padding:0 2vw;font-weight:700;font-size:2.6vh;white-space:nowrap}
+#tWrap{flex:1;overflow:hidden;height:100%;position:relative}
+#tText{position:absolute;top:0;left:0;height:100%;display:flex;align-items:center;white-space:nowrap;font-size:2.8vh;will-change:transform}
+.ph{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#0a0a0a;color:#555;font-size:3vh}
+.ph span{font-size:10vh;margin-bottom:2vh}
+#gear{position:absolute;top:1vh;left:1vw;width:6vh;height:6vh;font-size:3.5vh;background:rgba(255,255,255,.08);border:0;border-radius:50%;color:#fff;opacity:.25;cursor:pointer;z-index:20}
+#gear:focus,#gear:hover{opacity:1;outline:3px solid #2f81f7}
+.modal{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:30;cursor:default}
+.modal.on{display:flex}
+.box{background:#161b22;border:1px solid #2d3642;border-radius:12px;padding:3vh 2.5vw;width:44vw;max-height:92vh;overflow:auto;font-size:2vh}
+.box h2{font-size:3vh;margin-bottom:2vh}
+.box label{display:block;color:#8b98a5;margin:1.4vh 0 .5vh;font-size:1.8vh}
+.box input{width:100%;padding:1.2vh;font-size:2vh;background:#0d1117;color:#fff;border:1px solid #2d3642;border-radius:6px}
+.box input:focus,.box button:focus{outline:3px solid #2f81f7}
+.grid2{display:flex;gap:1vw}.grid2>div{flex:1}
+.btns{display:flex;flex-wrap:wrap;gap:1vh;margin-top:2.4vh}
+.box button{padding:1.2vh 1.4vw;font-size:2vh;border:0;border-radius:6px;background:#2d3642;color:#fff;cursor:pointer;font-weight:700}
+.b-pri{background:#2f81f7!important}.b-ok{background:#2ea043!important}.b-bad{background:#b62324!important}
+#pinMsg{color:#f85149;min-height:2.4vh;margin-top:1vh}
+#info{color:#8b98a5;font-size:1.6vh;margin-top:2vh;line-height:1.6}
+#toast{position:absolute;top:3vh;left:50%;transform:translateX(-50%);background:#2ea043;color:#fff;padding:1.6vh 3vw;border-radius:1vh;font-size:2.6vh;font-weight:700;display:none;z-index:40;box-shadow:0 1vh 3vh rgba(0,0,0,.5)}
+#empty{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:3vh;color:#8b98a5;text-align:center;padding:5vw}
+#empty b{color:#fff;font-size:4.5vh;margin-bottom:2vh}
+</style>
 </head>
 <body>
-
-<button id="configTrigger" onclick="openAdminWithPassword()">⚙️</button>
-<img id="brandLogo" src="" alt="Logo" class="logo-top-right">
-
-<!-- Toast de Notificação -->
-<div id="updateToast">🔄 Playlist atualizada com sucesso!</div>
-
-<!-- Painel Administrativo -->
-<div id="adminPanel">
-    <div class="panel-content">
-        <h2>📺 Configuração Avançada da Tela</h2>
-        
-        <label>Definir Nova Senha de Acesso</label>
-        <input type="password" id="adminPassword" class="input-box" placeholder="Deixe em branco para manter a atual">
-
-        <label>URL Remota da Playlist (JSON)</label>
-        <input type="url" id="remoteJsonUrl" class="input-box" placeholder="https://seu-servidor.com/playlist.json">
-        
-        <label>Logotipo da Empresa (Link URL ou código Base64 para Offline)</label>
-        <input type="text" id="logoUrl" class="input-box" placeholder="https://... ou data:image/png;base64,...">
-
-        <div class="row">
-            <div>
-                <label>Posição do Logotipo</label>
-                <select id="logoPosition" class="input-box">
-                    <option value="logo-top-right">Superior Direito</option>
-                    <option value="logo-top-left">Superior Esquerdo</option>
-                    <option value="logo-bottom-right">Inferior Direito</option>
-                    <option value="logo-bottom-left">Inferior Esquerdo</option>
-                </select>
-            </div>
-            <div>
-                <label>Layout da Tela</label>
-                <select id="layoutMode" class="input-box">
-                    <option value="full">Tela Cheia Tradicional (100%)</option>
-                    <option value="split">Layout Dividido (70% Mídia / 30% Menu)</option>
-                </select>
-            </div>
-        </div>
-
-        <label>Texto do Menu Lateral Fixo (Caso ativado)</label>
-        <textarea id="sideMenuText" class="input-box" rows="2" placeholder="Digite ofertas ou comunicados aqui..."></textarea>
-
-        <div class="row">
-            <div>
-                <label>Canal de Notícias</label>
-                <select id="newsTopic" class="input-box">
-                    <option value="https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/rss2.xml">Notícias Gerais (G1)</option>
-                    <option value="https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/economia/rss2.xml">Economia (G1)</option>
-                    <option value="https://api.allorigins.win/raw?url=https://ge.globo.com/dynamo/rss2.xml">Esportes (GE)</option>
-                    <option value="https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/tecnologia/rss2.xml">Tecnologia</option>
-                </select>
-            </div>
-            <div>
-                <label>Sincronização Remota</label>
-                <select id="refreshInterval" class="input-box">
-                    <option value="900000">A cada 15 min</option>
-                    <option value="3600000" selected>A cada 1 hora</option>
-                    <option value="7200000">A cada 2 horas</option>
-                </select>
-            </div>
-        </div>
-
-        <button class="btn-action" onclick="saveSettings()">Salvar e Aplicar Alterações</button>
-        <button class="btn-action btn-danger" onclick="factoryReset()">⚠️ Limpar Tudo e Reiniciar</button>
-    </div>
+<div id="app">
+ <div id="stage"><div id="empty"><b>Mídia Indoor</b>Nenhuma playlist configurada.<br>Pressione ⚙️ (canto superior esquerdo) e informe a URL da playlist.</div></div>
+ <aside id="side">
+  <img class="logo" id="sLogo" alt="" style="display:none">
+  <div><div id="sClock">--:--</div><div id="sDate"></div></div>
+  <div id="sWeather"></div>
+ </aside>
+ <div id="overlay"><img id="oLogo" alt="" style="display:none"><span id="oWeather"></span><span id="oClock">--:--</span></div>
+ <div id="ticker"><div id="tLabel">📰 NOTÍCIAS</div><div id="tWrap"><div id="tText"></div></div></div>
 </div>
+<button id="gear" title="Configurações" onclick="abrirPin()">⚙️</button>
 
-<!-- Estrutura Visual Principal -->
-<div id="screenWrapper">
-    <div id="playerContainer">
-        <img id="imgPlayer" class="media-node" src="" alt="Imagem">
-        <video id="vidPlayer" class="media-node" muted playsinline></video>
-        <iframe id="webPlayer" class="media-node" src=""></iframe>
-    </div>
-    
-    <div id="sideMenu">
-        <h2 id="sideMenuTitle">Destaques</h2>
-        <div id="sideContent">Carregando informativos...</div>
-    </div>
-</div>
+<div class="modal" id="mPin"><div class="box" style="width:30vw">
+ <h2>🔒 Acesso técnico</h2><label>PIN</label>
+ <input id="pin" type="password" inputmode="numeric" maxlength="8" onkeydown="if(event.keyCode===13)checarPin()">
+ <div id="pinMsg"></div>
+ <div class="btns"><button class="b-pri" onclick="checarPin()">Entrar</button><button onclick="fechar('mPin')">Cancelar</button></div>
+</div></div>
 
-<!-- Rodapé Informativo -->
-<div id="bottomTicker">
-    <div id="tickerNews">
-        <div class="marquee-text" id="newsContainer">Sincronizando as principais informações do sistema...</div>
-    </div>
-    <div id="tickerWidget">
-        <span id="txtClima">☀️ 28°C</span>
-        <span id="txtRelogio">00:00:00</span>
-    </div>
-</div>
+<div class="modal" id="mCfg"><div class="box">
+ <h2>⚙️ Painel Administrativo</h2>
+ <label>URL da Playlist JSON remota</label><input id="cUrl" placeholder="https://seusite.com/playlist.json">
+ <div class="grid2">
+  <div><label>Rolagem do rodapé (segundos por volta)</label><input id="cTick" type="number" min="5" max="600" step="1"></div>
+  <div><label>Novo PIN (vazio = manter)</label><input id="cPin" type="password" inputmode="numeric" maxlength="8"></div>
+ </div>
+ <label>URL do Logotipo (link ou Base64)</label><input id="cLogo" placeholder="https://... ou data:image/png;base64,...">
+ <div class="grid2">
+  <div><label>Cidade (clima)</label><input id="cCity" placeholder="São Paulo,BR"></div>
+  <div><label>API Key OpenWeatherMap</label><input id="cKey"></div>
+ </div>
+ <label>Endpoint Heartbeat / Auditoria (POST)</label><input id="cBeat" placeholder="https://seusite.com/api/audit">
+ <label>Feed RSS (via proxy)</label><input id="cRss">
+ <label>Texto institucional (exibido offline)</label><input id="cInst">
+ <div class="btns">
+  <button class="b-pri" onclick="salvarCfg()">💾 Salvar</button>
+  <button class="b-ok" onclick="sincronizar(true)">🔄 Forçar Atualização</button>
+  <button onclick="exportarLogs()">⬇️ Exportar Logs</button>
+  <button class="b-bad" onclick="resetFabrica()">⚠️ Reset de Fábrica</button>
+  <button onclick="fechar('mCfg')">Fechar</button>
+ </div>
+ <div id="info"></div>
+</div></div>
+<div id="toast"></div>
 
 <script>
-    let playlist = [];
-    let currentIndex = -1;
-    let mainTimer = null;
+(function(){
+'use strict';
+var DEF={url:'',tick:40,logo:'',city:'',key:'',beat:'',pin:'1234',
+ rss:'https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fg1.globo.com%2Frss%2Fg1%2F',
+ inst:'Bem-vindo! Confira nossas ofertas e novidades. Siga-nos nas redes sociais.'};
+var K={cfg:'mi_cfg',pl:'mi_playlist',logs:'mi_logs',wx:'mi_weather',news:'mi_news',dev:'mi_device'};
+function ld(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function sv(k,v){try{localStorage.setItem(k,JSON.stringify(v));return true}catch(e){return false}}
+function $(id){return document.getElementById(id)}
+var cfg=ld(K.cfg,{});for(var p in DEF)if(cfg[p]===undefined)cfg[p]=DEF[p];
+var device=ld(K.dev,null);if(!device){device='TV-'+Math.random().toString(36).slice(2,8).toUpperCase();sv(K.dev,device)}
+var playlist=ld(K.pl,{itens:[]});
+var logs=ld(K.logs,[]);
+var idx=-1,timer=null,lastSync=null,current=null;
 
-    window.onload = function() {
-        loadSettings();
-        updateClock();
-        setInterval(updateClock, 1000);
-        setupTicker();
-    };
+/* ---------- utilidades ---------- */
+function toast(m,ms){var t=$('toast');t.textContent=m;t.style.display='block';clearTimeout(t._h);t._h=setTimeout(function(){t.style.display='none'},ms||6000)}
+function xhr(method,url,body,cb){
+ try{var x=new XMLHttpRequest();x.open(method,url,true);x.timeout=15000;
+  if(body)x.setRequestHeader('Content-Type','application/json');
+  x.onload=function(){cb(x.status>=200&&x.status<300?null:x.status,x.responseText)};
+  x.onerror=x.ontimeout=function(){cb('rede')};x.send(body||null);}catch(e){cb(e)}
+}
+function pad(n){return(n<10?'0':'')+n}
 
-    function updateClock() {
-        const agora = new Date();
-        document.getElementById('txtRelogio').innerText = agora.toLocaleTimeString('pt-BR');
-    }
+/* ---------- agendamento ---------- */
+function turnoAtual(){var h=new Date().getHours();return h>=6&&h<12?'manha':h>=12&&h<18?'tarde':'noite'}
+function hojeISO(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function ativos(){
+ var hoje=hojeISO(),t=turnoAtual();
+ return (playlist.itens||[]).filter(function(it){
+  if(!it||!it.src)return false;
+  if(it.inicio&&hoje<it.inicio)return false;
+  if(it.fim&&hoje>it.fim)return false;
+  var tu=it.turno||'sempre';return tu==='sempre'||tu===t;
+ });
+}
 
-    function openAdminWithPassword() {
-        const savedPassword = localStorage.getItem('indoor_password') || '1234';
-        const typedPassword = prompt('Digite a senha administrativa para acessar as configurações:');
-        if (typedPassword === savedPassword) {
-            document.getElementById('adminPanel').style.display = 'flex';
-        } else if (typedPassword !== null) {
-            alert('Senha incorreta!');
-        }
-    }
+/* ---------- player ---------- */
+function proximo(){
+ clearTimeout(timer);
+ var lista=ativos(),stage=$('stage');
+ if(!lista.length){limparStage();stage.innerHTML='<div id="empty"><b>Mídia Indoor</b>'+((playlist.itens||[]).length?'Nenhuma mídia programada para este horário.':'Nenhuma playlist configurada.<br>Pressione ⚙️ e informe a URL da playlist.')+'</div>';$('app').className='';timer=setTimeout(proximo,30000);return}
+ idx=(idx+1)%lista.length;
+ exibir(lista[idx]);
+}
+function limparStage(){
+ var s=$('stage');var v=s.getElementsByTagName('video');
+ for(var i=0;i<v.length;i++){try{v[i].pause();v[i].removeAttribute('src');v[i].load()}catch(e){}}
+ s.innerHTML='';
+}
+function falha(it){
+ limparStage();
+ $('stage').innerHTML='<div class="ph"><span>🖼️</span>Conteúdo indisponível</div>';
+ clearTimeout(timer);timer=setTimeout(proximo,2500);
+}
+function exibir(it){
+ current=it;limparStage();
+ $('app').className=it.layout==='split'?'split':'';
+ var s=$('stage'),dur=(+it.duracao||0)*1000,el,tipo=it.tipo||'imagem';
+ var registrado=false;function reg(){if(!registrado){registrado=true;registrar(it)}}
+ if(tipo==='video'){
+  el=document.createElement('video');el.muted=true;el.autoplay=true;el.setAttribute('playsinline','');el.preload='auto';
+  el.onerror=function(){falha(it)};
+  el.onplaying=reg;
+  el.onended=function(){proximo()};
+  el.src=it.src;s.appendChild(el);
+  var pr=el.play();if(pr&&pr.catch)pr.catch(function(){});
+  timer=setTimeout(proximo,dur>0?dur:300000); /* trava de segurança */
+  if(dur>0)el.onended=null;
+  /* se o vídeo for mais curto que o tempo configurado, repete */
+  if(dur>0)el.loop=true;
+ }else if(tipo==='web'){
+  el=document.createElement('iframe');el.src=it.src;el.setAttribute('scrolling','no');s.appendChild(el);reg();
+  timer=setTimeout(proximo,dur||15000);
+ }else{
+  el=new Image();
+  el.onload=function(){reg()};
+  el.onerror=function(){falha(it)};
+  el.src=it.src;s.appendChild(el);
+  timer=setTimeout(proximo,dur||10000);
+ }
+}
 
-    function toggleAdmin() {
-        const panel = document.getElementById('adminPanel');
-        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
-    }
+/* ---------- proof-of-play & heartbeat ---------- */
+function registrar(it){
+ logs.push({id:it.id||it.src.slice(0,80),nome:it.nome||'Sem nome',tipo:it.tipo,layout:it.layout||'full',ts:new Date().toISOString(),dispositivo:device});
+ if(logs.length>20000)logs=logs.slice(-20000);
+ if(!sv(K.logs,logs)){logs=logs.slice(-5000);sv(K.logs,logs)}
+}
+function heartbeat(){
+ if(!cfg.beat)return;
+ var lote=logs.slice(),body=JSON.stringify({dispositivo:device,enviado:new Date().toISOString(),online:navigator.onLine,itensPlaylist:(playlist.itens||[]).length,logs:lote});
+ xhr('POST',cfg.beat,body,function(err){
+  if(err)return; /* mantém buffer para a próxima tentativa */
+  logs=logs.slice(lote.length);sv(K.logs,logs);
+ });
+}
+function exportarLogs(){
+ var txt=JSON.stringify({dispositivo:device,exportado:new Date().toISOString(),logs:logs},null,2);
+ try{var b=new Blob([txt],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='proof_of_play_'+device+'_'+hojeISO()+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove()},500);toast('Logs exportados ('+logs.length+' registros)',3000)}
+ catch(e){toast('Este navegador não permite download',3000)}
+}
 
-    function saveSettings() {
-        const newPass = document.getElementById('adminPassword').value;
-        if(newPass.trim() !== "") {
-            localStorage.setItem('indoor_password', newPass);
-        }
-        
-        localStorage.setItem('indoor_json_url', document.getElementById('remoteJsonUrl').value);
-        localStorage.setItem('indoor_logo_url', document.getElementById('logoUrl').value);
-        localStorage.setItem('indoor_logo_pos', document.getElementById('logoPosition').value);
-        localStorage.setItem('indoor_layout_mode', document.getElementById('layoutMode').value);
-        localStorage.setItem('indoor_side_text', document.getElementById('sideMenuText').value);
-        localStorage.setItem('indoor_news_topic', document.getElementById('newsTopic').value);
-        localStorage.setItem('indoor_refresh_time', document.getElementById('refreshInterval').value);
-        
-        document.getElementById('adminPassword').value = '';
-        toggleAdmin();
-        applyVisualChanges();
-        syncPlaylist();
-        setupTicker();
-    }
+/* ---------- sincronização ---------- */
+function sincronizar(manual){
+ if(!cfg.url){if(manual)toast('Informe a URL da playlist',3000);return}
+ var u=cfg.url+(cfg.url.indexOf('?')>-1?'&':'?')+'_='+Date.now();
+ xhr('GET',u,null,function(err,txt){
+  if(err){if(manual)toast('Sem conexão — usando cópia offline',4000);return}
+  try{
+   var d=JSON.parse(txt),itens=Array.isArray(d)?d:(d.itens||d.items||[]);
+   var novo={itens:itens,atualizado:d.atualizado||new Date().toISOString()};
+   var mudou=JSON.stringify(novo.itens)!==JSON.stringify(playlist.itens);
+   playlist=novo;lastSync=new Date();
+   if(!sv(K.pl,playlist))toast('Playlist grande demais para o cache offline',4000);
+   if(mudou||manual){toast('✔ Playlist atualizada!');if(mudou){idx=-1;proximo()}}
+   info();
+  }catch(e){if(manual)toast('JSON da playlist inválido',4000)}
+ });
+}
 
-    function loadSettings() {
-        document.getElementById('remoteJsonUrl').value = localStorage.getItem('indoor_json_url') || '';
-        document.getElementById('logoUrl').value = localStorage.getItem('indoor_logo_url') || '';
-        document.getElementById('logoPosition').value = localStorage.getItem('indoor_logo_pos') || 'logo-top-right';
-        document.getElementById('layoutMode').value = localStorage.getItem('indoor_layout_mode') || 'full';
-        document.getElementById('sideMenuText').value = localStorage.getItem('indoor_side_text') || 'Confiram nossas soluções exclusivas de Mídia Indoor offline!';
-        document.getElementById('newsTopic').value = localStorage.getItem('indoor_news_topic') || 'https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/rss2.xml';
-        
-        applyVisualChanges();
-        
-        const localSaved = localStorage.getItem('indoor_cached_playlist');
-        if(localSaved) {
-            playlist = JSON.parse(localSaved);
-            startPlaybackFlow();
-        }
-        
-        if(localStorage.getItem('indoor_json_url')) {
-            syncPlaylist();
-            setInterval(syncPlaylist, parseInt(localStorage.getItem('indoor_refresh_time')) || 3600000);
-        }
-    }
+/* ---------- relógio, clima, logo ---------- */
+var DIAS=['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];
+var MESES=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+function relogio(){var d=new Date(),h=pad(d.getHours())+':'+pad(d.getMinutes());$('sClock').textContent=h;$('oClock').textContent=h;$('sDate').textContent=DIAS[d.getDay()]+', '+d.getDate()+' de '+MESES[d.getMonth()]}
+function icone(c){c=c||'';return c.indexOf('01')===0?'☀️':c.indexOf('02')===0?'🌤️':c.indexOf('03')===0||c.indexOf('04')===0?'☁️':c.indexOf('09')===0||c.indexOf('10')===0?'🌧️':c.indexOf('11')===0?'⛈️':c.indexOf('13')===0?'❄️':c.indexOf('50')===0?'🌫️':'🌡️'}
+function pintarClima(w){if(!w){$('sWeather').innerHTML='';$('oWeather').textContent='';return}
+ $('sWeather').innerHTML='<b>'+icone(w.icon)+' '+w.temp+'°</b>'+w.city+'<br><span style="opacity:.7;text-transform:capitalize">'+w.desc+'</span>';
+ $('oWeather').textContent=icone(w.icon)+' '+w.temp+'°C'}
+function clima(){
+ pintarClima(ld(K.wx,null));
+ if(!cfg.city||!cfg.key)return;
+ xhr('GET','https://api.openweathermap.org/data/2.5/weather?q='+encodeURIComponent(cfg.city)+'&appid='+encodeURIComponent(cfg.key)+'&units=metric&lang=pt_br',null,function(err,txt){
+  if(err)return;try{var d=JSON.parse(txt),w={temp:Math.round(d.main.temp),desc:d.weather[0].description,icon:d.weather[0].icon,city:d.name};sv(K.wx,w);pintarClima(w)}catch(e){}
+ });
+}
+function logo(){var a=[$('sLogo'),$('oLogo')];for(var i=0;i<2;i++){var el=a[i];if(cfg.logo){el.onerror=function(){this.style.display='none'};el.src=cfg.logo;el.style.display=''}else el.style.display='none'}}
 
-    function applyVisualChanges() {
-        const logo = localStorage.getItem('indoor_logo_url');
-        const pos = localStorage.getItem('indoor_logo_pos') || 'logo-top-right';
-        const imgEl = document.getElementById('brandLogo');
-        
-        imgEl.className = '';
-        imgEl.classList.add(pos);
-        
-        if(logo && logo.trim() !== "") { 
-            imgEl.src = logo; 
-            imgEl.style.display = 'block'; 
-        } else { 
-            imgEl.style.display = 'none'; 
-        }
+/* ---------- ticker ---------- */
+var tPos=0,tW=0,tLast=0,tRaf;
+function setTicker(txt){var t=$('tText');t.textContent=txt;tW=t.offsetWidth;tPos=$('tWrap').offsetWidth}
+function tickLoop(ts){
+ if(tLast){var wrap=$('tWrap').offsetWidth,dist=wrap+tW,vel=dist/Math.max(5,+cfg.tick||40);tPos-=vel*(ts-tLast)/1000;if(tPos<-tW)tPos=wrap}
+ tLast=ts;var t=$('tText');t.style.transform='translateX('+tPos+'px)';t.style.webkitTransform='translateX('+tPos+'px)';
+ tRaf=(window.requestAnimationFrame||function(f){return setTimeout(function(){f(Date.now())},33)})(tickLoop);
+}
+function noticias(){
+ var cache=ld(K.news,null),sep='     •     ';
+ var offline=function(){setTicker(cache&&cache.length?cache.join(sep)+sep+cfg.inst:cfg.inst)};
+ if(!cfg.rss||!navigator.onLine){offline();return}
+ xhr('GET',cfg.rss,null,function(err,txt){
+  if(err){offline();return}
+  try{var d=JSON.parse(txt),its=(d.items||[]).slice(0,15).map(function(i){return i.title});
+   if(!its.length){offline();return}cache=its;sv(K.news,its);setTicker(its.join(sep)+sep+cfg.inst)}catch(e){offline()}
+ });
+}
 
-        const layout = localStorage.getItem('indoor_layout_mode') || 'full';
-        const sideText = localStorage.getItem('indoor_side_text') || '';
-        
-        if(layout === 'split') {
-            document.body.classList.add('split-layout');
-            document.getElementById('sideContent').innerText = sideText;
-        } else {
-            document.body.classList.remove('split-layout');
-        }
-    }
+/* ---------- painel ---------- */
+var aberto=false;
+function abrirPin(){$('pin').value='';$('pinMsg').textContent='';$('mPin').className='modal on';document.body.style.cursor='default';setTimeout(function(){$('pin').focus()},50)}
+window.abrirPin=abrirPin;
+window.checarPin=function(){
+ if($('pin').value===String(cfg.pin)){fechar('mPin');abrirCfg()}else{$('pinMsg').textContent='PIN incorreto';$('pin').value=''}
+};
+function fechar(id){$(id).className='modal';if(!$('mPin').className.match(/on/)&&!$('mCfg').className.match(/on/))document.body.style.cursor='none'}
+window.fechar=fechar;
+function abrirCfg(){
+ $('cUrl').value=cfg.url;$('cTick').value=cfg.tick;$('cLogo').value=cfg.logo;$('cCity').value=cfg.city;$('cKey').value=cfg.key;
+ $('cBeat').value=cfg.beat;$('cRss').value=cfg.rss;$('cInst').value=cfg.inst;$('cPin').value='';
+ info();$('mCfg').className='modal on';document.body.style.cursor='default';setTimeout(function(){$('cUrl').focus()},50);
+}
+function info(){
+ $('info').innerHTML='Dispositivo: <b>'+device+'</b> · '+(navigator.onLine?'🟢 Online':'🔴 Offline')+'<br>Mídias na playlist: '+(playlist.itens||[]).length+' · Ativas agora: '+ativos().length+'<br>Última sincronização: '+(lastSync?lastSync.toLocaleString('pt-BR'):'—')+'<br>Registros de exibição pendentes: '+logs.length;
+}
+window.salvarCfg=function(){
+ var urlMudou=$('cUrl').value.trim()!==cfg.url;
+ cfg.url=$('cUrl').value.trim();cfg.tick=Math.max(5,parseInt($('cTick').value,10)||40);cfg.logo=$('cLogo').value.trim();
+ cfg.city=$('cCity').value.trim();cfg.key=$('cKey').value.trim();cfg.beat=$('cBeat').value.trim();cfg.rss=$('cRss').value.trim();cfg.inst=$('cInst').value.trim()||DEF.inst;
+ var np=$('cPin').value.trim();if(np){if(!/^\d{4,8}$/.test(np)){toast('O PIN deve ter de 4 a 8 números',3000);return}cfg.pin=np}
+ sv(K.cfg,cfg);logo();clima();noticias();if(urlMudou)sincronizar(true);toast('Configurações salvas',3000);fechar('mCfg');
+};
+window.sincronizar=sincronizar;window.exportarLogs=exportarLogs;
+window.resetFabrica=function(){
+ if(!confirm('Apagar todas as configurações, cache da playlist e logs?'))return;
+ for(var k in K)if(k!=='dev')localStorage.removeItem(K[k]);location.reload();
+};
 
-    async function syncPlaylist() {
-        const url = localStorage.getItem('indoor_json_url');
-        if(!url) return;
-        try {
-            const res = await fetch(url + '?nocache=' + new Date().getTime());
-            const data = await res.json();
-            if(Array.isArray(data)) {
-                playlist = data;
-                localStorage.setItem('indoor_cached_playlist', JSON.stringify(data));
-                showToast();
-                if(currentIndex === -1) startPlaybackFlow();
-            }
-        } catch(err) {
-            console.error("Falha na sincronização online. Mantendo mídias locais seguras.", err);
-        }
-    }
+/* teclas do controle remoto: Menu/Enter longo/“0” abre o painel; Esc/Back fecha */
+document.addEventListener('keydown',function(e){
+ var c=e.keyCode,emModal=/on/.test($('mPin').className)||/on/.test($('mCfg').className);
+ if(!emModal&&(c===48||c===96||c===18||c===93||c===457)){abrirPin();e.preventDefault()}
+ if(emModal&&(c===27||c===10009||c===461)){fechar('mPin');fechar('mCfg');e.preventDefault()}
+});
+window.addEventListener('online',function(){sincronizar(false);noticias();heartbeat()});
 
-    function showToast() {
-        const toast = document.getElementById('updateToast');
-        toast.classList.add('show');
-        setTimeout(() => {
-            toast.classList.remove('show');
-        }, 4000);
-    }
-
-    function factoryReset() {
-        if(confirm('Tem certeza de que deseja apagar TODOS os dados, senhas, mídias e caches salvos nesta TV?')) {
-            localStorage.clear();
-            alert('Sistema totalmente limpo. A página será reiniciada.');
-            window.location.reload();
-        }
-    }
-
-    function checkTurn(schedule) {
-        if (!schedule || schedule === 'all') return true;
-        const hora = new Date().getHours();
-        if (schedule === 'manha' && hora >= 6 && hora < 12) return true;
-        if (schedule === 'tarde' && hora >= 12 && hora < 18) return true;
-        if (schedule === 'noite' && (hora >= 18 || hora < 6)) return true;
-        return false;
-    }
-
-    function startPlaybackFlow() {
-        if(!playlist.length) return;
-        clearTimeout(mainTimer);
-        
-        let attempts = 0;
-        do {
-            currentIndex = (currentIndex + 1) % playlist.length;
-            attempts++;
-        } while(!checkTurn(playlist[currentIndex].schedule) && attempts <= playlist.length);
-
-        displayMedia(playlist[currentIndex]);
-    }
-
-    function clearActiveMedia() {
-        document.querySelectorAll('.media-node').forEach(node => {
-            node.classList.remove('active');
-            if(node.tagName === 'VIDEO') node.pause();
-        });
-    }
-
-    function displayMedia(item) {
-        clearActiveMedia();
-        let fallbackTimer = setTimeout(startPlaybackFlow, 2000); 
-
-        if(item.type === 'image') {
-            const img = document.getElementById('imgPlayer');
-            img.src = item.url;
-            img.onload = () => { clearTimeout(fallbackTimer); img.classList.add('active'); mainTimer = setTimeout(startPlaybackFlow, item.duration * 1000); };
-            img.onerror = () => startPlaybackFlow();
-        } 
-        else if(item.type === 'video') {
-            const vid = document.getElementById('vidPlayer');
-            vid.src = item.url;
-            vid.oncanplaythrough = () => { 
-                clearTimeout(fallbackTimer); 
-                vid.classList.add('active'); 
-                vid.play().catch(() => {});
-                vid.onended = startPlaybackFlow;
-            };
-            vid.onerror = () => startPlaybackFlow();
-        } 
-        else if(item.type === 'web') {
-            const web = document.getElementById('webPlayer');
-            web.src = item.url;
-            web.onload = () => { clearTimeout(fallbackTimer); web.classList.add('active'); mainTimer = setTimeout(startPlaybackFlow, item.duration * 1000); };
-            web.onerror = () => startPlaybackFlow();
-        }
-    }
-
-    async function setupTicker() {
-        const feedUrl = localStorage.getItem('indoor_news_topic') || 'https://api.allorigins.win/raw?url=https://g1.globo.com/dynamo/rss2.xml';
-        const container = document.getElementById('newsContainer');
-        
-        try {
-            const response = await fetch(feedUrl);
-            const textData = await response.text();
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(textData, "text/xml");
-            const items = xmlDoc.getElementsByTagName("item");
-            
-            let headlines = [];
-            for (let i = 0; i < Math.min(items.length, 10); i++) {
-                const title = items[i].getElementsByTagName("title").textContent || items[i].getElementsByTagName("title")[0].innerHTML;
-                headlines.push(title);
-            }
-            container.innerText = headlines.join("   •   ") + "   •   ";
-        } catch (e) {
-            container.innerText = "Informativo: Programação e campanhas rodando em modo contínuo de contingência local.";
-        }
-    }
+/* ---------- inicialização ---------- */
+relogio();setInterval(relogio,1000);
+logo();clima();setInterval(clima,30*60000);
+noticias();setInterval(noticias,15*60000);
+tickLoop(0);
+proximo();
+sincronizar(false);setInterval(function(){sincronizar(false)},5*60000);
+setInterval(heartbeat,5*60000);
+setInterval(function(){var a=ativos();if(current&&a.indexOf(current)<0&&a.length)proximo()},60000); /* troca de turno/validade */
+})();
 </script>
 </body>
 </html>
