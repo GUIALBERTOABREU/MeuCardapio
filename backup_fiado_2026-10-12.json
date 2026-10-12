@@ -1,0 +1,59 @@
+{
+  "clientes": [
+    {
+      "id": 1791768778301,
+      "nome": "Guiga",
+      "telefone": "(98) 98881-5481",
+      "limite": 500
+    },
+    {
+      "id": 1791768852383,
+      "nome": "Duda",
+      "telefone": "(98) 98778-2436",
+      "limite": 250
+    },
+    {
+      "id": 1791768893581,
+      "nome": "Emilly",
+      "telefone": "(98) 99995-4683",
+      "limite": 200
+    },
+    {
+      "id": 1791768926097,
+      "nome": "Edgar",
+      "telefone": "(98) 98741-8090",
+      "limite": 300
+    }
+  ],
+  "vendas": [
+    {
+      "id": 1791768966459,
+      "clienteId": 1791768778301,
+      "valor": 30,
+      "descricao": "Banana + Uva + Laranja",
+      "data": "2026-10-12T01:36:06.459Z"
+    },
+    {
+      "id": 1791769019565,
+      "clienteId": 1791768852383,
+      "valor": 20,
+      "descricao": "Banana + Maçã",
+      "data": "2026-10-12T01:36:59.565Z"
+    },
+    {
+      "id": 1791769134345,
+      "clienteId": 1791768778301,
+      "valor": 25,
+      "descricao": "Melancia",
+      "data": "2026-10-12T01:38:54.345Z"
+    }
+  ],
+  "pagamentos": [
+    {
+      "id": 1791769315496,
+      "clienteId": 1791768778301,
+      "valor": 60,
+      "data": "2026-10-12T01:41:55.496Z"
+    }
+  ]
+}

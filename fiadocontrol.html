@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FiadoControl - Sistema de Gerenciamento de Vendas</title>
+    <style>
+        :root {
+            --bg-primary: #f8fafc;
+            --bg-surface: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --success: #16a34a;
+            --danger: #dc2626;
+            --warning: #ca8a04;
+            --border: #e2e8f0;
+            --radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            display: flex;
+            min-height: 100vh;
+        }
+
+        aside {
+            width: 260px;
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            padding: 2rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .brand h2 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-links {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .nav-item {
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius);
+            cursor: pointer;
+            color: var(--text-muted);
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background-color: #eff6ff;
+            color: var(--primary);
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+        }
+
+        .view-section {
+            display: none;
+        }
+
+        .view-section.active {
+            display: block;
+        }
+
+        h1 {
+            margin-bottom: 1.5rem;
+            font-size: 1.75rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: var(--bg-surface);
+            padding: 1.5rem;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .card .title {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        .card .value {
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .value.danger { color: var(--danger); }
+        .value.success { color: var(--success); }
+
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        input, select {
+            padding: 0.625rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            outline: none;
+        }
+
+        input:focus, select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        button {
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-secondary { background: var(--border); color: var(--text-main); }
+        .btn-success { background: var(--success); color: white; }
+
+        .table-container {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow-x: auto;
+            margin-top: 1.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        th, td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background-color: #f8fafc;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-danger { background: #fee2e2; color: var(--danger); }
+        .actions-cell { display: flex; gap: 0.5rem; }
+        .btn-sm { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
+
+        #printable-receipt {
+            display: none;
+            max-width: 320px;
+            margin: 2rem auto;
+            padding: 1.5rem;
+            background: #fff;
+            border: 1px dashed #000;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000;
+        }
+
+        @media print {
+            body * { display: none !important; }
+            #printable-receipt, #printable-receipt * { display: block !important; }
+            #printable-receipt { border: none; margin: 0; padding: 0; width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <aside>
+        <div class="brand"><h2>📝 FiadoControl</h2></div>
+        <ul class="nav-links">
+            <li class="nav-item active" onclick="switchView('dashboard', this)">Painel Inicial</li>
+            <li class="nav-item" onclick="switchView('clientes', this)">Clientes</li>
+            <li class="nav-item" onclick="withEngine('vendas', this)">Lançar Venda</li>
+            <li class="nav-item" onclick="withEngine('pagamentos', this)">Receber Pagamento</li>
+            <li class="nav-item" onclick="switchView('dados', this)">Importar / Exportar</li>
+        </ul>
+    </aside>
+
+    <main>
+        <section id="dashboard-view" class="view-section active">
+            <h1>Painel de Controle</h1>
+            <div class="stats-grid">
+                <div class="card">
+                    <div class="title">Total a Receber (Fiado)</div>
+                    <div class="value danger" id="stat-total-devedor">R$ 0,00</div>
+                </div>
+                <div class="card">
+                    <div class="title">Clientes Inadimplentes</div>
+                    <div class="value" id="stat-clientes-devedores">0</div>
+                </div>
+                <div class="card">
+                    <div class="title">Total Recebido (Geral)</div>
+                    <div class="value success" id="stat-total-recebido">R$ 0,00</div>
+                </div>
+            </div>
+            <h2>Devedores Ativos</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Cliente</th><th>Limite Utilizado</th><th>Saldo Devedor</th><th>Status</th></tr>
+                    </thead>
+                    <tbody id="table-resumo-devedores"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="clientes-view" class="view-section">
+            <h1>Gerenciamento de Clientes</h1>
+            <div class="card">
+                <form id="form-cliente" onsubmit="salvarCliente(event)">
+                    <div class="form-grid">
+                        <div class="form-group"><label for="cli-nome">Nome Completo</label><input type="text" id="cli-nome" required placeholder="Ex: João da Silva"></div>
+                        <div class="form-group">
+                            <label for="cli-telefone">Telefone (DDD + Número)</label>
+                            <input type="tel" id="cli-telefone" required placeholder="(99) 99999-9999" maxlength="15" oninput="aplicarMascaraTelefone(this)">
+                        </div>
+                        <div class="form-group"><label for="cli-limite">Limite de Crédito (R$)</label><input type="number" id="cli-limite" step="0.01" required placeholder="500.00"></div>
+                    </div>
+                    <button type="submit" class="btn-primary">Adicionar Cliente</button>
+                </form>
+            </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Nome</th><th>Telefone</th><th>Limite Total</th><th>Saldo Devedor</th><th>Ações</th></tr>
+                    </thead>
+                    <tbody id="table-clientes"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="vendas-view" class="view-section">
+            <h1>Lançar Nova Venda (Fiado)</h1>
+            <div class="card">
+                <form id="form-venda" onsubmit="registrarVenda(event)">
+                    <div class="form-grid">
+                        <div class="form-group"><label for="venda-cliente">Selecionar Cliente</label><select id="venda-cliente" required></select></div>
+                        <div class="form-group"><label for="venda-valor">Valor da Venda (R$)</label><input type="number" id="venda-valor" step="0.01" required placeholder="0.00"></div>
+                        <div class="form-group"><label for="venda-descricao">Descrição</label><input type="text" id="venda-descricao" required placeholder="Ex: Compra de mercadorias"></div>
+                    </div>
+                    <button type="submit" class="btn-primary">Confirmar Venda no Fiado</button>
+                </form>
+            </div>
+            <h2 style="margin-top: 2rem;">Histórico Recente de Vendas</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Data</th><th>Cliente</th><th>Descrição</th><th>Valor</th><th>Comprovante</th></tr>
+                    </thead>
+                    <tbody id="table-historico-vendas"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="pagamentos-view" class="view-section">
+            <h1>Registrar Pagamento / Abatimento</h1>
+            <div class="card">
+                <form id="form-pagamento" onsubmit="registrarPagamento(event)">
+                    <div class="form-grid">
+                        <div class="form-group"><label for="pag-cliente">Selecionar Cliente</label><select id="pag-cliente" required onchange="atualizarAvisoSaldo()"></select></div>
+                        <div class="form-group"><label for="pag-valor">Valor Pago (R$)</label><input type="number" id="pag-valor" step="0.01" required placeholder="0.00"></div>
+                        <div class="form-group"><label>Saldo Devedor Atual</label><input type="text" id="pag-aviso-saldo" readonly style="background: #f1f5f9; font-weight: bold;"></div>
+                    </div>
+                    <button type="submit" class="btn-success">Abater Dívida</button>
+                </form>
+            </div>
+            <h2 style="margin-top: 2rem;">Histórico Recente de Recebimentos</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr><th>Data</th><th>Cliente</th><th>Valor Abatido</th><th>Comprovante</th></tr>
+                    </thead>
+                    <tbody id="table-historico-pagamentos"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section id="dados-view" class="view-section">
+            <h1>Cópia de Segurança & Persistência (JSON)</h1>
+            <div class="card" style="display: flex; gap: 2rem; flex-wrap: wrap;">
+                <div>
+                    <h3>Exportar Base de Dados</h3>
+                    <p style="font-size: 0.875rem; color: var(--text-muted); margin: 0.5rem 0 1rem 0;">Baixe as tabelas do sistema de fiado estruturadas.</p>
+                    <button onclick="exportarDados()" class="btn-primary">Exportar para JSON</button>
+                </div>
+                <div style="border-left: 1px solid var(--border); padding-left: 2rem;">
+                    <h3>Importar Base de Dados</h3>
+                    <p style="font-size: 0.875rem; color: var(--text-muted); margin: 0.5rem 0 1rem 0;">Atualize a persistência local enviando o arquivo.</p>
+                    <input type="file" id="import-file" accept=".json" style="margin-bottom: 1rem; display: block;">
+                    <button onclick="importarDados()" class="btn-secondary">Importar Arquivo JSON</button>
+                </div>
+            </div>
+        </section>
+        
+        <div id="printable-receipt"></div>
+    </main>
+
+    <script>
+        let AppState = { clientes: [], vendas: [], pagamentos: [] };
+
+        document.addEventListener("DOMContentLoaded", () => {
+            carregarDadosDoStorage();
+            if (typeof renderizarTudo === "function") renderizarTudo();
+        });
+
+        function carregarDadosDoStorage() {
+            const dadosLocais = localStorage.getItem("fiado_control_db");
+            if (dadosLocais) {
+                try { AppState = JSON.parse(dadosLocais); } catch (e) { console.error("Database read corruption error:", e); }
+            }
+        }
+
+        function salvarNoStorage() {
+            localStorage.setItem("fiado_control_db", JSON.stringify(AppState));
+            if (typeof renderizarTudo === "function") renderizarTudo();
+        }
+
+        const formatarMoeda = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+        const formatarData = (d) => new Date(d).toLocaleDateString('pt-BR');
+
+        function obterSaldoDevedor(clienteId) {
+            const totalVendas = AppState.vendas
+                .filter(v => v.clienteId === clienteId)
+                .reduce((acc, c) => acc + c.valor, 0);
+
+            const totalPagos = AppState.pagamentos
+                .filter(p => p.clienteId === clienteId)
+                .reduce((acc, c) => acc + c.valor, 0);
+
+            return totalVendas - totalPagos;
+        }
+
+        function validarTelefone(tel) {
+            const num = tel.replace(/\D/g, "");
+            return num.length === 11;
+        }
+
+        function exportarDados() {
+            const blob = new Blob([JSON.stringify(AppState, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url; 
+            a.download = `backup_fiado_${new Date().toISOString().slice(0,10)}.json`;
+            a.click(); 
+            URL.revokeObjectURL(url);
+        }
+    </script>
+
+    <script>
+        function renderizarTudo() {
+            let totalDevedorGeral = 0, inadimplentesContagem = 0;
+            const tbodyResumo = document.getElementById("table-resumo-devedores");
+            if (!tbodyResumo) return;
+            
+            tbodyResumo.innerHTML = "";
+
+            AppState.clientes.forEach(c => {
+                const saldo = obterSaldoDevedor(c.id);
+                if (saldo > 0) {
+                    totalDevedorGeral += saldo;
+                    inadimplentesContagem++;
+                    tbodyResumo.innerHTML += `<tr><td><strong>${c.nome}</strong></td><td>${formatarMoeda(saldo)} / ${formatarMoeda(c.limite)}</td><td class="danger">${formatarMoeda(saldo)}</td><td><span class="badge badge-danger">Aberto</span></td></tr>`;
+                }
+            });
+
+            document.getElementById("stat-total-devedor").innerText = formatarMoeda(totalDevedorGeral);
+            document.getElementById("stat-clientes-devedores").innerText = inadimplentesContagem;
+            document.getElementById("stat-total-recebido").innerText = formatarMoeda(AppState.pagamentos.reduce((acc, c) => acc + c.valor, 0));
+
+            const tbodyCli = document.getElementById("table-clientes");
+            tbodyCli.innerHTML = "";
+            AppState.clientes.forEach(c => {
+                const saldo = obterSaldoDevedor(c.id);
+                tbodyCli.innerHTML += `<tr><td>${c.nome}</td><td>${c.telefone}</td><td>${formatarMoeda(c.limite)}</td><td class="${saldo > 0 ? 'danger' : ''}">${formatarMoeda(saldo)}</td><td class="actions-cell"><button class="btn-secondary btn-sm" onclick="removerCliente(${c.id})">Excluir</button></td></tr>`;
+            });
+
+            const selVenda = document.getElementById("venda-cliente"), selPag = document.getElementById("pag-cliente");
+            if(selVenda && selPag) {
+                selVenda.innerHTML = selPag.innerHTML = '<option value="">-- Escolha o Cliente --</option>';
+                AppState.clientes.forEach(c => {
+                    const opt = `<option value="${c.id}">${c.nome}</option>`;
+                    selVenda.innerHTML += opt; selPag.innerHTML += opt;
+                });
+            }
+
+            const tbodyVendas = document.getElementById("table-historico-vendas");
+            if(tbodyVendas) {
+                tbodyVendas.innerHTML = "";
+                [...AppState.vendas].reverse().forEach(v => {
+                    const c = AppState.clientes.find(cli => cli.id === v.clienteId);
+                    tbodyVendas.innerHTML += `<tr><td>${formatarData(v.data)}</td><td>${c ? c.nome : 'Excluído'}</td><td>${v.descricao}</td><td>${formatarMoeda(v.valor)}</td><td class="actions-cell"><button class="btn-secondary btn-sm" onclick="imprimirRecibo('venda', ${v.id})">🖨️ Imprimir</button><button class="btn-primary btn-sm" onclick="enviarMensagemZap('venda', ${v.id})">📱 Enviar</button></td></tr>`;
+                });
+            }
+
+            const tbodyPag = document.getElementById("table-historico-pagamentos");
+            if(tbodyPag) {
+                tbodyPag.innerHTML = "";
+                [...AppState.pagamentos].reverse().forEach(p => {
+                    const c = AppState.clientes.find(cli => cli.id === p.clienteId);
+                    tbodyPag.innerHTML += `<tr><td>${formatarData(p.data)}</td><td>${c ? c.nome : 'Excluído'}</td><td style="color:var(--success); font-weight:bold;">+ ${formatarMoeda(p.valor)}</td><td class="actions-cell"><button class="btn-secondary btn-sm" onclick="imprimirRecibo('pagamento', ${p.id})">🖨️ Imprimir</button><button class="btn-primary btn-sm" onclick="enviarMensagemZap('pagamento', ${p.id})">📱 Enviar</button></td></tr>`;
+                });
+            }
+        }
+
+        function aplicarMascaraTelefone(input) {
+            let valor = input.value.replace(/\D/g, "");
+            if (valor.length > 11) valor = valor.slice(0, 11);
+            if (valor.length > 6) { input.value = `(${valor.slice(0, 2)}) ${valor.slice(2, 7)}-${valor.slice(7)}`; }
+            else if (valor.length > 2) { input.value = `(${valor.slice(0, 2)}) ${valor.slice(2)}`; }
+            else if (valor.length > 0) { input.value = `(${valor}`; }
+        }
+
+        function atualizarAvisoSaldo() {
+            const selectComponent = document.getElementById("pag-cliente");
+            const inputAviso = document.getElementById("pag-aviso-saldo");
+            if(selectComponent && inputAviso) {
+                const id = parseInt(selectComponent.value);
+                inputAviso.value = id ? formatarMoeda(obterSaldoDevedor(id)) : "R\$ 0,00";
+            }
+        }
+
+        function switchView(viewName, elementRef) {
+            document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
+            const target = document.getElementById(`${viewName}-view`);
+            if(target) target.classList.add('active');
+            if(elementRef) elementRef.classList.add('active');
+        }
+
+        function withEngine(viewName, elementRef) {
+            switchView(viewName, elementRef);
+            atualizarAvisoSaldo();
+        }
+
+        function salvarCliente(e) {
+            e.preventDefault();
+            const telInput = document.getElementById("cli-telefone").value;
+            if(!validarTelefone(telInput)) return alert("Erro: Telefone incompleto. Digite os 11 dígitos com DDD.");
+
+            AppState.clientes.push({
+                id: Date.now(),
+                nome: document.getElementById("cli-nome").value,
+                telefone: telInput,
+                limite: parseFloat(document.getElementById("cli-limite").value)
+            });
+            salvarNoStorage();
+            document.getElementById("form-cliente").reset();
+        }
+
+        function removerCliente(id) {
+            if(confirm("Deseja remover este cliente?")) {
+                AppState.clientes = AppState.clientes.filter(c => c.id !== id);
+                salvarNoStorage();
+            }
+        }
+
+        function registrarVenda(e) {
+            e.preventDefault();
+            const clienteId = parseInt(document.getElementById("venda-cliente").value);
+            const valor = parseFloat(document.getElementById("venda-valor").value);
+            const cli = AppState.clientes.find(c => c.id === clienteId);
+
+            if ((obterSaldoDevedor(clienteId) + valor) > cli.limite) {
+                if (!confirm(`Alerta: Venda ultrapassa o limite de crédito (${formatarMoeda(cli.limite)}). Autorizar?`)) return;
+            }
+
+            AppState.vendas.push({ id: Date.now(), clienteId, valor, descricao: document.getElementById("venda-descricao").value, data: new Date().toISOString() });
+            salvarNoStorage();
+            document.getElementById("form-venda").reset();
+            alert("Venda registrada!");
+        }
+
+        function registrarPagamento(e) {
+            e.preventDefault();
+            AppState.pagamentos.push({
+                id: Date.now(),
+                clienteId: parseInt(document.getElementById("pag-cliente").value),
+                valor: parseFloat(document.getElementById("pag-valor").value),
+                data: new Date().toISOString()
+            });
+            salvarNoStorage();
+            document.getElementById("form-pagamento").reset();
+            alert("Pagamento processado com sucesso!");
+        }
+
+        function gerarTemplateRecibo(tipo, id) {
+            if(tipo === "venda") {
+                const venda = AppState.vendas.find(v => v.id === id);
+                const cli = AppState.clientes.find(c => c.id === venda.clienteId);
+                return `<div style="text-align:center;font-weight:bold;margin-bottom:10px;">*** COMPROVANTE DE FIADO ***</div><div>DATA: ${formatarData(venda.data)}</div><div>CLIENTE: ${cli ? cli.nome : 'N/A'}</div><div style="border-bottom:1px dashed #000;margin:5px 0;"></div><div>DESC: ${venda.descricao}</div><div style="font-weight:bold;font-size:1.1rem;margin-top:5px;">VALOR: ${formatarMoeda(venda.valor)}</div><div style="border-bottom:1px dashed #000;margin:5px 0;"></div><div style="font-size:0.9rem;">SALDO ATUAL DEVEDOR: ${formatarMoeda(obterSaldoDevedor(venda.clienteId))}</div><div style="text-align:center;margin-top:20px;font-size:0.8rem;">Assinatura do Cliente</div><div style="border-bottom:1px solid #000;margin-top:25px;"></div>`;
+            } else {
+                const pag = AppState.pagamentos.find(p => p.id === id);
+                const cli = AppState.clientes.find(c => c.id === pag.clienteId);
+                return `<div style="text-align:center;font-weight:bold;margin-bottom:10px;">*** RECIBO DE PAGAMENTO ***</div><div>DATA: ${formatarData(pag.data)}</div><div>CLIENTE: ${cli ? cli.nome : 'N/A'}</div><div style="border-bottom:1px dashed #000;margin:5px 0;"></div><div style="font-weight:bold;color:green;">VALOR PAGO: ${formatarMoeda(pag.valor)}</div><div style="border-bottom:1px dashed #000;margin:5px 0;"></div><div>RESTANTE DEVEDOR: ${formatarMoeda(obterSaldoDevedor(pag.clienteId))}</div>`;
+            }
+        }
+
+        function imprimirRecibo(tipo, id) {
+            const container = document.getElementById("printable-receipt");
+            if(container) { container.innerHTML = gerarTemplateRecibo(tipo, id); window.print(); }
+        }
+
+        function enviarMensagemZap(tipo, id) {
+            let msg = "", cli, numLimpo;
+            if(tipo === "venda") {
+                const venda = AppState.vendas.find(v => v.id === id);
+                cli = AppState.clientes.find(c => c.id === venda.clienteId);
+                if(!cli) return;
+                msg = `Olá ${cli.nome}, confirmando a compra de "${venda.descricao}" no valor de ${formatarMoeda(venda.valor)} lançada no seu fiado em ${formatarData(venda.data)}. Seu saldo devedor atual é de ${formatarMoeda(obterSaldoDevedor(cli.id))}.`;
+            } else {
+                const pag = AppState.pagamentos.find(p => p.id === id);
+                cli = AppState.clientes.find(c => c.id === pag.clienteId);
+                if(!cli) return;
+                msg = `Olá ${cli.nome}, recebemos seu pagamento de ${formatarMoeda(pag.valor)} em ${formatarData(pag.data)}. Seu saldo devedor restante é de ${formatarMoeda(obterSaldoDevedor(cli.id))}. Obrigado!`;
+            }
+            numLimpo = cli.telefone.replace(/\D/g, "");
+            window.open(`https://api.whatsapp.com/send?phone=55${numLimpo}&text=${encodeURIComponent(msg)}`, '_blank');
+        }
+
+        function importarDados() {
+            const input = document.getElementById("import-file");
+            if (!input || !input.files.length) return alert("Selecione um arquivo de backup primeiro.");
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const dados = JSON.parse(e.target.result);
+                    if(dados.clientes && dados.vendas) { AppState = dados; salvarNoStorage(); alert("Banco de dados JSON atualizado!"); }
+                } catch { alert("Arquivo JSON inválido ou corrompido."); }
+            };
+            reader.readAsText(input.files);
+        }
+    </script>
+</body>
+</html>
